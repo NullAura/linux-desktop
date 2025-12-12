@@ -23,17 +23,16 @@ const API_BASE = getContextPath();
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
-    // 检查SSH连接状态
-    checkSSHConnection();
-    
     // SSH连接表单提交
     document.getElementById('sshForm').addEventListener('submit', function(e) {
         e.preventDefault();
         connectSSH();
     });
     
-    // 初始化桌面图标
-    initDesktopIcons();
+    // 检查SSH连接状态并切换页面
+    checkSSHConnection().then(connected => {
+        switchPage(connected);
+    });
     
     // 初始化窗口拖拽
     initWindowDragging();
@@ -42,19 +41,37 @@ document.addEventListener('DOMContentLoaded', function() {
     initContextMenu();
 });
 
+// 切换页面显示
+function switchPage(showDesktop) {
+    const connectionPage = document.getElementById('connectionPage');
+    const desktopPage = document.getElementById('desktopPage');
+    
+    if (showDesktop) {
+        // 显示桌面页面
+        connectionPage.classList.add('hidden');
+        desktopPage.classList.remove('hidden');
+        // 初始化桌面图标
+        initDesktopIcons();
+    } else {
+        // 显示连接页面
+        connectionPage.classList.remove('hidden');
+        desktopPage.classList.add('hidden');
+    }
+}
+
 // 更新连接状态显示
 function updateConnectionStatus(connected, username, host) {
     const statusElement = document.getElementById('connectionStatus');
     if (connected && username && host) {
         statusElement.textContent = '已连接: ' + username + '@' + host;
         statusElement.classList.add('connected');
-        // 更新桌面图标
-        setTimeout(initDesktopIcons, 100);
+        // 切换到桌面页面
+        switchPage(true);
     } else {
         statusElement.textContent = '未连接';
         statusElement.classList.remove('connected');
-        // 更新桌面图标
-        setTimeout(initDesktopIcons, 100);
+        // 切换到连接页面
+        switchPage(false);
     }
 }
 
@@ -116,14 +133,15 @@ function showMessage(message, type) {
     }, 3000);
 }
 
-// 显示SSH连接对话框
+// 显示SSH连接对话框（切换到连接页面）
 function showSSHDialog() {
-    document.getElementById('sshDialog').classList.remove('hidden');
+    switchPage(false);
 }
 
-// 关闭SSH连接对话框
-function closeSSHDialog() {
-    document.getElementById('sshDialog').classList.add('hidden');
+// 断开连接并返回连接页面
+function disconnectSSH() {
+    // 可以添加断开连接的逻辑
+    updateConnectionStatus(false);
 }
 
 // 连接SSH
@@ -141,13 +159,11 @@ function connectSSH() {
     
     // 显示连接状态
     const connectBtn = document.getElementById('connectBtn');
-    const cancelBtn = document.getElementById('cancelBtn');
     const connectingStatus = document.getElementById('connectingStatus');
     const connectingText = connectingStatus.querySelector('.connecting-text');
     
     // 禁用按钮，显示加载状态
     connectBtn.disabled = true;
-    cancelBtn.disabled = true;
     connectingStatus.classList.remove('hidden');
     connectingText.textContent = '正在连接服务器...';
     
@@ -198,35 +214,32 @@ function connectSSH() {
         connectingText.textContent = '连接成功！';
         
         if (data.success) {
-            // 短暂延迟后关闭对话框，让用户看到成功提示
+            // 短暂延迟后切换到桌面页面，让用户看到成功提示
             setTimeout(() => {
-                // 更新连接状态
-                updateConnectionStatus(true, username, host);
-                
                 // 重置UI状态
                 connectBtn.disabled = false;
-                cancelBtn.disabled = false;
                 connectingStatus.classList.add('hidden');
-                closeSSHDialog();
+                
+                // 保存桌面路径
+                if (data.desktopPath) {
+                    window.desktopPath = data.desktopPath;
+                } else {
+                    window.desktopPath = null;
+                }
+                
+                // 更新连接状态（会自动切换到桌面页面）
+                updateConnectionStatus(true, username, host);
                 
                 // 显示成功提示（包含桌面文件夹信息）
                 let message = '连接成功！';
                 if (data.desktopPath) {
                     message += ' 桌面文件夹: ' + data.desktopPath;
-                    // 保存桌面路径到全局变量
-                    window.desktopPath = data.desktopPath;
-                } else {
-                    window.desktopPath = null;
                 }
                 showMessage(message, 'success');
-                
-                // 连接成功后显示桌面图标
-                initDesktopIcons();
             }, 500);
         } else {
             // 连接失败
             connectBtn.disabled = false;
-            cancelBtn.disabled = false;
             connectingStatus.classList.add('hidden');
             alert('连接失败: ' + data.message);
         }
@@ -236,7 +249,6 @@ function connectSSH() {
         
         // 重置UI状态
         connectBtn.disabled = false;
-        cancelBtn.disabled = false;
         connectingStatus.classList.add('hidden');
         
         console.error('SSH连接错误详情:', error);

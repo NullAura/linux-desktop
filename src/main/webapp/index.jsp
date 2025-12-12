@@ -6,46 +6,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Linux可视化桌面</title>
     <link rel="stylesheet" href="css/desktop.css">
+    <link rel="stylesheet" href="css/connection-page.css">
 </head>
 <body>
-    <!-- SSH连接对话框 -->
-    <div id="sshDialog" class="dialog-overlay">
-        <div class="dialog-content">
-            <h2>SSH连接</h2>
-            <form id="sshForm">
-                <div class="form-group">
-                    <label>主机地址:</label>
-                    <input type="text" id="host" name="host" value="localhost" required>
-                </div>
-                <div class="form-group">
-                    <label>端口:</label>
-                    <input type="number" id="port" name="port" value="22" required>
-                </div>
-                <div class="form-group">
-                    <label>用户名:</label>
-                    <input type="text" id="username" name="username" required>
-                </div>
-                <div class="form-group">
-                    <label>密码:</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                <div class="form-buttons">
-                    <button type="submit" id="connectBtn">连接</button>
-                    <button type="button" onclick="closeSSHDialog()" id="cancelBtn">取消</button>
-                </div>
-                <div id="connectingStatus" class="connecting-status hidden">
-                    <div class="spinner"></div>
-                    <span class="connecting-text">正在连接服务器...</span>
-                </div>
-            </form>
+    <!-- 连接页面 -->
+    <div id="connectionPage" class="connection-page">
+        <div class="connection-container">
+            <div class="connection-header">
+                <h1>Linux可视化桌面</h1>
+                <p>通过SSH连接远程Linux服务器</p>
+            </div>
+            <div class="connection-form-wrapper">
+                <form id="sshForm" class="connection-form">
+                    <h2>SSH连接</h2>
+                    <div class="form-group">
+                        <label>主机地址:</label>
+                        <input type="text" id="host" name="host" value="localhost" required>
+                    </div>
+                    <div class="form-group">
+                        <label>端口:</label>
+                        <input type="number" id="port" name="port" value="22" required>
+                    </div>
+                    <div class="form-group">
+                        <label>用户名:</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label>密码:</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <div class="form-buttons">
+                        <button type="submit" id="connectBtn">连接</button>
+                    </div>
+                    <div id="connectingStatus" class="connecting-status hidden">
+                        <div class="spinner"></div>
+                        <span class="connecting-text">正在连接服务器...</span>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
-    <!-- 桌面顶部工具栏 -->
+    <!-- 桌面页面 -->
+    <div id="desktopPage" class="desktop-page hidden">
+        <!-- 桌面顶部工具栏 -->
     <div class="taskbar">
         <div class="taskbar-left">
-            <button class="taskbar-btn" onclick="showSSHDialog()" title="SSH连接">
-                <span>🔌</span> SSH连接
+            <button class="taskbar-btn" onclick="disconnectSSH()" title="断开连接">
+                <span>🔌</span> 断开连接
             </button>
             <button class="taskbar-btn" onclick="openFileManager()" title="文件管理器">
                 <span>📁</span> 文件管理器
@@ -62,9 +70,10 @@
         </div>
     </div>
 
-    <!-- 桌面区域 -->
-    <div class="desktop" id="desktop">
-        <!-- 桌面图标将在这里动态生成 -->
+        <!-- 桌面区域 -->
+        <div class="desktop" id="desktop">
+            <!-- 桌面图标将在这里动态生成 -->
+        </div>
     </div>
 
     <!-- 文件管理器窗口 -->

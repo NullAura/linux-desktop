@@ -1,0 +1,63 @@
+/* 连接页面样式 */
+.connection-page {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.connection-page.hidden {
+    display: none;
+}
+
+.connection-container {
+    width: 100%;
+    max-width: 500px;
+    padding: 40px;
+}
+
+.connection-header {
+    text-align: center;
+    color: white;
+    margin-bottom: 40px;
+}
+
+.connection-header h1 {
+    font-size: 36px;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.connection-header p {
+    font-size: 16px;
+    opacity: 0.9;
+}
+
+.connection-form-wrapper {
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.connection-form h2 {
+    margin-top: 0;
+    margin-bottom: 25px;
+    color: #333;
+    text-align: center;
+}
+
+/* 桌面页面 */
+.desktop-page {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.desktop-page.hidden {
+    display: none;
+}
+
