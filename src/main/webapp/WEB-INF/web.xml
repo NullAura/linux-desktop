@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee 
+         http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
+         version="3.1">
+    
+    <display-name>Linux Visual Desktop</display-name>
+    <description>Linux可视化桌面系统</description>
+    
+    <!-- 欢迎页面 -->
+    <welcome-file-list>
+        <welcome-file>index.jsp</welcome-file>
+    </welcome-file-list>
+    
+    <!-- 字符编码过滤器 -->
+    <filter>
+        <filter-name>CharacterEncodingFilter</filter-name>
+        <filter-class>com.linuxdesktop.filter.CharacterEncodingFilter</filter-class>
+        <init-param>
+            <param-name>encoding</param-name>
+            <param-value>UTF-8</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>CharacterEncodingFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+    
+    <!-- SSH连接Servlet -->
+    <servlet>
+        <servlet-name>SSHConnectServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.SSHConnectServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>SSHConnectServlet</servlet-name>
+        <url-pattern>/ssh/connect</url-pattern>
+    </servlet-mapping>
+    
+    <!-- 文件列表Servlet -->
+    <servlet>
+        <servlet-name>FileListServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.FileListServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>FileListServlet</servlet-name>
+        <url-pattern>/api/file/list</url-pattern>
+    </servlet-mapping>
+    
+    <!-- 文件属性Servlet -->
+    <servlet>
+        <servlet-name>FilePropertyServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.FilePropertyServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>FilePropertyServlet</servlet-name>
+        <url-pattern>/api/file/property</url-pattern>
+    </servlet-mapping>
+    
+    <!-- 命令执行Servlet -->
+    <servlet>
+        <servlet-name>CommandExecuteServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.CommandExecuteServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>CommandExecuteServlet</servlet-name>
+        <url-pattern>/api/command/execute</url-pattern>
+    </servlet-mapping>
+    
+    <!-- 文件打开Servlet -->
+    <servlet>
+        <servlet-name>FileOpenServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.FileOpenServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>FileOpenServlet</servlet-name>
+        <url-pattern>/api/file/open</url-pattern>
+    </servlet-mapping>
+    
+    <!-- 进程列表Servlet -->
+    <servlet>
+        <servlet-name>ProcessListServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.ProcessListServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ProcessListServlet</servlet-name>
+        <url-pattern>/api/process/list</url-pattern>
+    </servlet-mapping>
+</web-app>
