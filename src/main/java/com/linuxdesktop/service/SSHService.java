@@ -319,6 +319,30 @@ public class SSHService {
         }
     }
 
+    public String getShellCwd() {
+        if (!isShellActive()) {
+            return null;
+        }
+        sendShellInput("pwd\n");
+        try {
+            Thread.sleep(150);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        String output = pollShellOutput();
+        if (output == null || output.isEmpty()) {
+            return null;
+        }
+        String[] lines = output.split("\n");
+        for (int i = lines.length - 1; i >= 0; i--) {
+            String line = lines[i].trim();
+            if (!line.isEmpty() && line.startsWith("/")) {
+                return line;
+            }
+        }
+        return null;
+    }
+
     public String pollShellOutput() {
         synchronized (shellLock) {
             if (shellBuffer.length() == 0) {

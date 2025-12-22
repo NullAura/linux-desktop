@@ -4,6 +4,8 @@ let fileManagerHistory = [];
 let selectedFile = null;
 let zIndex = 100;
 const DESKTOP_WALLPAPER_KEY = 'linuxDesktop.wallpaper';
+const TERMINAL_PROMPT_MARKER = '__LINUX_DESKTOP_PROMPT__';
+const TERMINAL_PWD_MARKER = '__LINUX_DESKTOP_PWD__';
 let terminalSessionActive = false;
 let terminalPollingTimer = null;
 let terminalPollingInFlight = false;
@@ -11,6 +13,9 @@ let lastTerminalCommand = '';
 let terminalActiveProgram = '';
 let terminalStartPromise = null;
 let terminalFallbackNotified = false;
+let terminalCwd = '';
+let terminalHome = '';
+let terminalPrompt = '#';
 const windowMeta = {
     fileManagerWindow: { title: '文件管理器', icon: '📁' },
     processWindow: { title: '进程管理', icon: '⚙️' },
@@ -68,6 +73,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initDesktopContextMenu();
     initWallpaperPicker();
     restoreDesktopBackground();
+
+    // 终端快捷键由 inline input 绑定
 });
 
 // 切换页面显示
@@ -879,13 +886,144 @@ function appendTerminalOutput(chunk) {
         output.textContent = '';
     }
     if (parsed.text) {
-        output.textContent += parsed.text;
-    }
-    const maxLength = 50000;
-    if (output.textContent.length > maxLength) {
-        output.textContent = output.textContent.slice(-maxLength);
+        appendTerminalText(stripTerminalMarkers(parsed.text));
     }
     output.scrollTop = output.scrollHeight;
+}
+
+function stripTerminalMarkers(text) {
+    const pwdRegex = new RegExp(TERMINAL_PWD_MARKER + '(.*?)' + TERMINAL_PWD_MARKER, 'g');
+    let match;
+    while ((match = pwdRegex.exec(text)) !== null) {
+        const path = match[1].trim();
+        if (path) {
+            terminalCwd = path;
+            if (!terminalHome) {
+                terminalHome = path;
+            }
+        }
+    }
+    let cleaned = text.replace(pwdRegex, '');
+    let promptCount = 0;
+    cleaned = cleaned.replace(new RegExp(TERMINAL_PROMPT_MARKER, 'g'), () => {
+        promptCount++;
+        return '';
+    });
+    if (promptCount > 0) {
+        if (!getTerminalInlineInput()) {
+            renderTerminalPromptLine();
+        }
+    }
+    return cleaned;
+}
+
+function appendTerminalText(text, className) {
+    const output = document.getElementById('terminalOutput');
+    if (!output || !text) return;
+    let node;
+    if (className) {
+        node = document.createElement('span');
+        node.className = className;
+        node.textContent = text;
+    } else {
+        node = document.createTextNode(text);
+    }
+    const promptLine = getTerminalPromptLine();
+    if (promptLine) {
+        output.insertBefore(node, promptLine);
+    } else {
+        output.appendChild(node);
+    }
+    trimTerminalOutput(output, 50000);
+}
+
+function renderTerminalPromptLine() {
+    const output = document.getElementById('terminalOutput');
+    if (!output) return;
+    const existing = getTerminalInlineInput();
+    if (existing) {
+        existing.focus();
+        return;
+    }
+    const line = document.createElement('div');
+    line.className = 'terminal-line';
+    const prompt = document.createElement('span');
+    prompt.className = 'terminal-prompt';
+    prompt.textContent = terminalPrompt + ' ';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'terminal-inline-input';
+    input.id = 'terminalInlineInput';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.addEventListener('keydown', handleTerminalInlineKeyDown);
+    line.appendChild(prompt);
+    line.appendChild(input);
+    output.appendChild(line);
+    input.focus();
+    output.scrollTop = output.scrollHeight;
+}
+
+function getTerminalInlineInput() {
+    return document.getElementById('terminalInlineInput');
+}
+
+function getTerminalPromptLine() {
+    const input = getTerminalInlineInput();
+    return input ? input.parentElement : null;
+}
+
+function handleTerminalInlineKeyDown(event) {
+    if (event.key === 'Tab') {
+        event.preventDefault();
+        handleTerminalTabCompletion();
+        return;
+    }
+    if (event.key === 'Enter') {
+        const input = event.target;
+        const command = input.value;
+        finalizeTerminalInputLine(input, command);
+        if (command.trim()) {
+            executeTerminalCommand(command);
+        } else if (terminalSessionActive) {
+            sendTerminalInput('\n', true);
+        } else {
+            renderTerminalPromptLine();
+        }
+    }
+}
+
+function finalizeTerminalInputLine(input, command) {
+    const line = input.parentElement;
+    input.removeAttribute('id');
+    input.disabled = true;
+    input.classList.add('terminal-inline-input-disabled');
+    const text = document.createElement('span');
+    text.className = 'terminal-command';
+    text.textContent = command;
+    line.removeChild(input);
+    line.appendChild(text);
+}
+
+function updateTerminalPrompt() {
+    terminalPrompt = '#';
+}
+
+function initializeShellPrompt() {
+    sendTerminalInput('stty -echo\n', true);
+    sendTerminalInput('export PS1="' + TERMINAL_PROMPT_MARKER + '"\n', true);
+}
+
+function trimTerminalOutput(output, maxLength) {
+    let currentLength = output.textContent.length;
+    if (currentLength <= maxLength) {
+        return;
+    }
+    while (output.firstChild && currentLength > maxLength) {
+        const len = output.firstChild.textContent.length;
+        output.removeChild(output.firstChild);
+        currentLength -= len;
+    }
 }
 
 function startTerminalSession() {
@@ -907,6 +1045,12 @@ function startTerminalSession() {
             terminalActiveProgram = '';
             terminalFallbackNotified = false;
             startTerminalPolling();
+            initializeShellPrompt();
+            refreshTerminalCwd();
+            updateTerminalPrompt();
+            if (!getTerminalInlineInput()) {
+                renderTerminalPromptLine();
+            }
             return true;
         }
         terminalSessionActive = false;
@@ -981,6 +1125,11 @@ function sendCommandToShell(command) {
     const isTopCommand = /^\s*(sudo\s+)?(top|htop)(\s|$)/i.test(command);
     const shouldInterrupt = terminalActiveProgram === 'top';
     lastTerminalCommand = command;
+    if (/^\s*cd\b/.test(command)) {
+        sendTerminalInput(command + '\n');
+        sendTerminalInput('printf "' + TERMINAL_PWD_MARKER + '%s' + TERMINAL_PWD_MARKER + '\\n" "$PWD"\n', true);
+        return;
+    }
     if (shouldInterrupt) {
         terminalActiveProgram = '';
         interruptTerminal().then(() => {
@@ -1000,6 +1149,8 @@ function stopTerminalSession(sendStopRequest) {
     lastTerminalCommand = '';
     terminalActiveProgram = '';
     terminalFallbackNotified = false;
+    terminalCwd = '';
+    terminalPrompt = '#';
     if (terminalPollingTimer) {
         clearInterval(terminalPollingTimer);
         terminalPollingTimer = null;
@@ -1013,6 +1164,154 @@ function stopTerminalSession(sendStopRequest) {
     }).catch(() => {});
 }
 
+function refreshTerminalCwd() {
+    fetch(API_BASE + '/api/command/execute', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'command=' + encodeURIComponent('pwd')
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.output) {
+            const line = data.output.split('\n')[0].trim();
+            if (line) {
+                terminalCwd = line;
+                if (!terminalHome) {
+                    terminalHome = line;
+                }
+            }
+        }
+    })
+    .catch(() => {});
+}
+
+function normalizePath(path) {
+    if (!path) {
+        return '';
+    }
+    const isAbs = path.startsWith('/');
+    const parts = path.split('/').filter(part => part && part !== '.');
+    const stack = [];
+    parts.forEach(part => {
+        if (part === '..') {
+            if (stack.length) {
+                stack.pop();
+            }
+        } else {
+            stack.push(part);
+        }
+    });
+    const normalized = (isAbs ? '/' : '') + stack.join('/');
+    return normalized || (isAbs ? '/' : '');
+}
+
+function updateTerminalCwdFromCommand(command) {
+    const trimmed = command.trim();
+    const match = trimmed.match(/^cd(?:\s+(.+))?$/);
+    if (!match) {
+        return;
+    }
+    const target = match[1] ? match[1].trim() : '';
+    if (!target || target === '~') {
+        if (terminalHome) {
+            terminalCwd = terminalHome;
+        }
+        return;
+    }
+    if (target === '-') {
+        return;
+    }
+    let next;
+    if (target.startsWith('/')) {
+        next = target;
+    } else if (target.startsWith('~')) {
+        const home = terminalHome || terminalCwd || '~';
+        next = home + target.slice(1);
+    } else {
+        const base = terminalCwd || terminalHome || '';
+        next = base ? base + '/' + target : target;
+    }
+    terminalCwd = normalizePath(next);
+}
+
+function getTerminalCompletionContext(value) {
+    const cursor = value.length;
+    const before = value.slice(0, cursor);
+    const tokenMatch = before.match(/(?:^|\s)([^\s]*)$/);
+    const token = tokenMatch ? tokenMatch[1] : '';
+    const start = before.length - token.length;
+    const trimmed = before.trim();
+    const isFirstToken = trimmed.length === token.length;
+    let kind = 'path';
+    if (isFirstToken) {
+        kind = 'command';
+    } else if (/^\s*cd\b/.test(trimmed)) {
+        kind = 'dir';
+    }
+    return { token, start, kind };
+}
+
+function applyTerminalCompletion(value, start, completion) {
+    const prefix = value.slice(0, start);
+    return prefix + completion;
+}
+
+function longestCommonPrefix(list) {
+    if (!list.length) {
+        return '';
+    }
+    let prefix = list[0];
+    for (let i = 1; i < list.length; i++) {
+        const item = list[i];
+        let j = 0;
+        while (j < prefix.length && j < item.length && prefix[j] === item[j]) {
+            j++;
+        }
+        prefix = prefix.slice(0, j);
+        if (!prefix) {
+            break;
+        }
+    }
+    return prefix;
+}
+
+function handleTerminalTabCompletion() {
+    const input = getTerminalInlineInput();
+    if (!input) return;
+    const value = input.value;
+    const ctx = getTerminalCompletionContext(value);
+    const prefix = ctx.token;
+    const query = new URLSearchParams();
+    query.set('prefix', prefix);
+    query.set('kind', ctx.kind);
+    if (terminalCwd) {
+        query.set('cwd', terminalCwd);
+    }
+    fetch(API_BASE + '/api/terminal/complete?' + query.toString())
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success || !Array.isArray(data.suggestions)) {
+                return;
+            }
+            const suggestions = data.suggestions;
+            if (!suggestions.length) {
+                return;
+            }
+            if (suggestions.length === 1) {
+                input.value = applyTerminalCompletion(value, ctx.start, suggestions[0]) + ' ';
+                return;
+            }
+            const common = longestCommonPrefix(suggestions);
+            if (common && common.length > prefix.length) {
+                input.value = applyTerminalCompletion(value, ctx.start, common);
+            }
+            appendTerminalText('\n' + suggestions.join('  ') + '\n', 'terminal-suggestion');
+        })
+        .catch(() => {});
+}
+
 // 打开终端
 function openTerminal() {
     const window = document.getElementById('terminalWindow');
@@ -1020,22 +1319,13 @@ function openTerminal() {
     ensureWindowPosition('terminalWindow', 1);
     bringWindowToFront('terminalWindow');
     registerWindow('terminalWindow');
-    document.getElementById('terminalInput').focus();
+    if (!getTerminalInlineInput()) {
+        renderTerminalPromptLine();
+    }
     startTerminalSession();
 }
 
 // 终端按键处理
-function handleTerminalKeyPress(event) {
-    if (event.key === 'Enter') {
-        const input = document.getElementById('terminalInput');
-        const command = input.value;
-        
-        if (command.trim()) {
-            executeTerminalCommand(command);
-            input.value = '';
-        }
-    }
-}
 
 // 执行终端命令
 function executeTerminalCommand(command) {
@@ -1052,7 +1342,6 @@ function executeTerminalCommand(command) {
             appendTerminalOutput('提示: 交互终端未启动，命令以单次执行模式运行（cd 不会保持）。\n');
             terminalFallbackNotified = true;
         }
-        appendTerminalOutput('$ ' + command + '\n');
         fetch(API_BASE + '/api/command/execute', {
             method: 'POST',
             headers: {
@@ -1071,7 +1360,9 @@ function executeTerminalCommand(command) {
         .catch(error => {
             appendTerminalOutput('错误: ' + error.message + '\n');
         });
+        renderTerminalPromptLine();
     });
+    return;
 }
 
 // 窗口管理

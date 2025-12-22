@@ -145,10 +145,6 @@
         </div>
         <div class="window-content">
             <div class="terminal-output" id="terminalOutput"></div>
-            <div class="terminal-input-line">
-                <span class="terminal-prompt">$</span>
-                <input type="text" id="terminalInput" class="terminal-input" onkeypress="handleTerminalKeyPress(event)">
-            </div>
         </div>
     </div>
 
