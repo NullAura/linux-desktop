@@ -3,6 +3,7 @@ let currentPath = '~';
 let fileManagerHistory = [];
 let selectedFile = null;
 let zIndex = 100;
+const DESKTOP_WALLPAPER_KEY = 'linuxDesktop.wallpaper';
 const windowMeta = {
     fileManagerWindow: { title: '文件管理器', icon: '📁' },
     processWindow: { title: '进程管理', icon: '⚙️' },
@@ -55,6 +56,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 任务栏时钟
     startTaskbarClock();
+
+    // 桌面右键菜单与背景
+    initDesktopContextMenu();
+    initWallpaperPicker();
+    restoreDesktopBackground();
 });
 
 // 切换页面显示
@@ -626,6 +632,110 @@ function initContextMenu() {
     createContextMenu();
 }
 
+// 初始化桌面右键菜单
+function initDesktopContextMenu() {
+    const desktop = document.getElementById('desktop');
+    if (!desktop) return;
+    desktop.addEventListener('contextmenu', (event) => {
+        if (event.target.closest('.desktop-icon')) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        showDesktopContextMenu(event);
+    });
+}
+
+// 显示桌面空白处右键菜单
+function showDesktopContextMenu(event) {
+    const menu = document.getElementById('contextMenu') || createContextMenu();
+    menu.innerHTML = `
+        <div class="context-menu-item" onclick="triggerWallpaperPicker()">更换背景...</div>
+        <div class="context-menu-item" onclick="resetDesktopBackground()">恢复默认背景</div>
+        <div class="context-menu-item" onclick="sortDesktopIconsByName(false)">图标按名称排序</div>
+        <div class="context-menu-item" onclick="sortDesktopIconsByName(true)">图标按名称倒序</div>
+        <div class="context-menu-item" onclick="resetDesktopIconLayout()">重置图标位置</div>
+    `;
+    menu.style.left = event.pageX + 'px';
+    menu.style.top = event.pageY + 'px';
+    menu.classList.add('show');
+    
+    setTimeout(() => {
+        const closeMenu = function() {
+            menu.classList.remove('show');
+            document.removeEventListener('click', closeMenu);
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 100);
+    }, 100);
+}
+
+function triggerWallpaperPicker() {
+    const input = document.getElementById('wallpaperPicker');
+    if (input) {
+        input.click();
+    }
+}
+
+function initWallpaperPicker() {
+    const input = document.getElementById('wallpaperPicker');
+    if (!input) return;
+    input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        input.value = '';
+        if (!file) return;
+        if (!file.type || !file.type.startsWith('image/')) {
+            showMessage('请选择图片文件', 'error');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            applyDesktopBackground(reader.result, true, file.size);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function applyDesktopBackground(dataUrl, persist, fileSize) {
+    const desktop = document.getElementById('desktop');
+    if (!desktop) return;
+    desktop.style.backgroundImage = `url('${dataUrl}')`;
+    desktop.style.backgroundSize = 'cover';
+    desktop.style.backgroundPosition = 'center';
+    desktop.style.backgroundRepeat = 'no-repeat';
+    try {
+        if (persist && typeof fileSize === 'number' && fileSize <= 2 * 1024 * 1024) {
+            localStorage.setItem(DESKTOP_WALLPAPER_KEY, dataUrl);
+        } else if (persist) {
+            localStorage.removeItem(DESKTOP_WALLPAPER_KEY);
+        }
+    } catch (e) {
+        if (persist) {
+            localStorage.removeItem(DESKTOP_WALLPAPER_KEY);
+        }
+    }
+}
+
+function resetDesktopBackground() {
+    const desktop = document.getElementById('desktop');
+    if (!desktop) return;
+    desktop.style.backgroundImage = '';
+    desktop.style.backgroundSize = '';
+    desktop.style.backgroundPosition = '';
+    desktop.style.backgroundRepeat = '';
+    localStorage.removeItem(DESKTOP_WALLPAPER_KEY);
+}
+
+function restoreDesktopBackground() {
+    try {
+        const saved = localStorage.getItem(DESKTOP_WALLPAPER_KEY);
+        if (saved) {
+            applyDesktopBackground(saved, false);
+        }
+    } catch (e) {
+        localStorage.removeItem(DESKTOP_WALLPAPER_KEY);
+    }
+}
+
 // 显示文件属性
 function showFileProperty(filePath) {
     fetch(API_BASE + '/api/file/property?path=' + encodeURIComponent(filePath))
@@ -916,16 +1026,12 @@ function initDesktopIcons() {
         return;
     }
     
-    // 如果已连接，显示所有应用图标（竖向排列）
+    // 如果已连接，显示所有应用图标
     let html = '';
     desktopApps.forEach((app, index) => {
-        // 竖向排列：固定left，根据index计算top
-        const left = 20;
-        const top = 20 + index * 120; // 每个图标间距120px
         html += `
             <div class="desktop-icon" 
                  data-app-id="${app.id}"
-                 style="left: ${left}px; top: ${top}px;"
                  onclick="desktopIconClick('${app.id}')"
                  oncontextmenu="showDesktopIconContextMenu(event, '${app.id}'); return false;">
                 <div class="desktop-icon-icon">${app.icon}</div>
@@ -935,6 +1041,44 @@ function initDesktopIcons() {
     });
     
     desktop.innerHTML = html;
+    layoutDesktopIcons(Array.from(desktop.querySelectorAll('.desktop-icon')));
+}
+
+function layoutDesktopIcons(icons) {
+    const desktop = document.getElementById('desktop');
+    if (!desktop) return;
+    const paddingLeft = 20;
+    const paddingTop = 20;
+    const cellWidth = 100;
+    const cellHeight = 110;
+    const availableHeight = Math.max(200, desktop.clientHeight - paddingTop);
+    const maxRows = Math.max(1, Math.floor(availableHeight / cellHeight));
+    icons.forEach((icon, index) => {
+        const row = index % maxRows;
+        const col = Math.floor(index / maxRows);
+        icon.style.left = `${paddingLeft + col * cellWidth}px`;
+        icon.style.top = `${paddingTop + row * cellHeight}px`;
+    });
+}
+
+function sortDesktopIconsByName(desc) {
+    const desktop = document.getElementById('desktop');
+    if (!desktop) return;
+    const icons = Array.from(desktop.querySelectorAll('.desktop-icon'));
+    icons.sort((a, b) => {
+        const nameA = a.querySelector('.desktop-icon-label')?.textContent || '';
+        const nameB = b.querySelector('.desktop-icon-label')?.textContent || '';
+        const result = nameA.localeCompare(nameB, 'zh-CN');
+        return desc ? -result : result;
+    });
+    layoutDesktopIcons(icons);
+}
+
+function resetDesktopIconLayout() {
+    const desktop = document.getElementById('desktop');
+    if (!desktop) return;
+    const icons = Array.from(desktop.querySelectorAll('.desktop-icon'));
+    layoutDesktopIcons(icons);
 }
 
 // 桌面图标点击事件（处理双击）

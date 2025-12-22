@@ -86,6 +86,7 @@
         <div class="desktop" id="desktop">
             <!-- 桌面图标将在这里动态生成 -->
         </div>
+        <input type="file" id="wallpaperPicker" accept="image/*" style="display:none">
     </div>
 
     <!-- 文件管理器窗口 -->
