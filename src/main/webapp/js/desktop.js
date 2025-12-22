@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
     restoreDesktopBackground();
 
     // 终端快捷键由 inline input 绑定
+    document.addEventListener('keydown', handleTerminalGlobalKeyDown);
 });
 
 // 切换页面显示
@@ -974,6 +975,19 @@ function getTerminalPromptLine() {
 }
 
 function handleTerminalInlineKeyDown(event) {
+    if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'c') {
+        event.preventDefault();
+        const input = event.target;
+        const command = input.value;
+        finalizeTerminalInputLine(input, command);
+        appendTerminalText('^C\n');
+        terminalActiveProgram = '';
+        if (terminalSessionActive) {
+            sendTerminalInput('\u0003', true);
+        }
+        renderTerminalPromptLine();
+        return;
+    }
     if (event.key === 'Tab') {
         event.preventDefault();
         handleTerminalTabCompletion();
@@ -991,6 +1005,31 @@ function handleTerminalInlineKeyDown(event) {
             renderTerminalPromptLine();
         }
     }
+}
+
+function handleTerminalGlobalKeyDown(event) {
+    if (!(event.ctrlKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === 'c')) {
+        return;
+    }
+    const terminalWindow = document.getElementById('terminalWindow');
+    if (!terminalWindow || terminalWindow.classList.contains('hidden')) {
+        return;
+    }
+    const activeElement = document.activeElement;
+    const inlineInput = getTerminalInlineInput();
+    if (inlineInput && activeElement === inlineInput) {
+        return;
+    }
+    if (!terminalActiveProgram && (!activeElement || !terminalWindow.contains(activeElement))) {
+        return;
+    }
+    event.preventDefault();
+    appendTerminalText('^C\n');
+    terminalActiveProgram = '';
+    if (terminalSessionActive) {
+        sendTerminalInput('\u0003', true);
+    }
+    renderTerminalPromptLine();
 }
 
 function finalizeTerminalInputLine(input, command) {
@@ -1331,11 +1370,13 @@ function openTerminal() {
 function executeTerminalCommand(command) {
     if (terminalSessionActive) {
         sendCommandToShell(command);
+        renderTerminalPromptLine();
         return;
     }
     startTerminalSession().then(active => {
         if (active) {
             sendCommandToShell(command);
+            renderTerminalPromptLine();
             return;
         }
         if (!terminalFallbackNotified) {
