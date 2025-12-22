@@ -4,6 +4,13 @@ let fileManagerHistory = [];
 let selectedFile = null;
 let zIndex = 100;
 const DESKTOP_WALLPAPER_KEY = 'linuxDesktop.wallpaper';
+let terminalSessionActive = false;
+let terminalPollingTimer = null;
+let terminalPollingInFlight = false;
+let lastTerminalCommand = '';
+let terminalActiveProgram = '';
+let terminalStartPromise = null;
+let terminalFallbackNotified = false;
 const windowMeta = {
     fileManagerWindow: { title: '文件管理器', icon: '📁' },
     processWindow: { title: '进程管理', icon: '⚙️' },
@@ -94,6 +101,7 @@ function updateConnectionStatus(connected, username, host) {
         statusElement.classList.remove('connected');
         // 切换到连接页面
         switchPage(false);
+        stopTerminalSession();
         clearOpenWindows();
     }
 }
@@ -164,6 +172,7 @@ function showSSHDialog() {
 // 断开连接并返回连接页面
 function disconnectSSH() {
     // 可以添加断开连接的逻辑
+    stopTerminalSession();
     updateConnectionStatus(false);
 }
 
@@ -851,6 +860,159 @@ function refreshProcessList() {
         });
 }
 
+function sanitizeTerminalChunk(chunk) {
+    if (!chunk) {
+        return { text: '', clear: false };
+    }
+    const shouldClear = /\x1b\[[0-9;?]*[HJ]/.test(chunk);
+    let text = chunk.replace(/\x1B\[[0-9;?=]*[A-Za-z]/g, '');
+    text = text.replace(/\x1B\][^\x07]*\x07/g, '');
+    text = text.replace(/\r/g, '');
+    return { text, clear: shouldClear };
+}
+
+function appendTerminalOutput(chunk) {
+    const output = document.getElementById('terminalOutput');
+    if (!output) return;
+    const parsed = sanitizeTerminalChunk(chunk);
+    if (parsed.clear) {
+        output.textContent = '';
+    }
+    if (parsed.text) {
+        output.textContent += parsed.text;
+    }
+    const maxLength = 50000;
+    if (output.textContent.length > maxLength) {
+        output.textContent = output.textContent.slice(-maxLength);
+    }
+    output.scrollTop = output.scrollHeight;
+}
+
+function startTerminalSession() {
+    if (terminalSessionActive) {
+        startTerminalPolling();
+        return Promise.resolve(true);
+    }
+    if (terminalStartPromise) {
+        return terminalStartPromise;
+    }
+    terminalStartPromise = fetch(API_BASE + '/api/terminal/start', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            terminalSessionActive = true;
+            lastTerminalCommand = '';
+            terminalActiveProgram = '';
+            terminalFallbackNotified = false;
+            startTerminalPolling();
+            return true;
+        }
+        terminalSessionActive = false;
+        appendTerminalOutput('终端启动失败: ' + (data.message || '未知错误') + '\n');
+        return false;
+    })
+    .catch(error => {
+        terminalSessionActive = false;
+        appendTerminalOutput('终端启动失败: ' + error.message + '\n');
+        return false;
+    })
+    .finally(() => {
+        terminalStartPromise = null;
+    });
+    return terminalStartPromise;
+}
+
+function startTerminalPolling() {
+    if (terminalPollingTimer) return;
+    pollTerminalOutput();
+    terminalPollingTimer = setInterval(pollTerminalOutput, 500);
+}
+
+function pollTerminalOutput() {
+    if (!terminalSessionActive || terminalPollingInFlight) return;
+    terminalPollingInFlight = true;
+    fetch(API_BASE + '/api/terminal/poll')
+        .then(response => response.json())
+        .then(data => {
+            terminalPollingInFlight = false;
+            if (!data || data.success === false) {
+                return;
+            }
+            if (!data.active) {
+                stopTerminalSession(false);
+                return;
+            }
+            if (data.output) {
+                appendTerminalOutput(data.output);
+            }
+        })
+        .catch(() => {
+            terminalPollingInFlight = false;
+        });
+}
+
+function sendTerminalInput(text, raw) {
+    const payload = 'input=' + encodeURIComponent(text) + (raw ? '&raw=1' : '');
+    return fetch(API_BASE + '/api/terminal/send', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: payload
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            appendTerminalOutput('命令发送失败: ' + (data.message || '未知错误') + '\n');
+        }
+    })
+    .catch(error => {
+        appendTerminalOutput('命令发送失败: ' + error.message + '\n');
+    });
+}
+
+function interruptTerminal() {
+    return sendTerminalInput('\u0003', true);
+}
+
+function sendCommandToShell(command) {
+    const isTopCommand = /^\s*(sudo\s+)?(top|htop)(\s|$)/i.test(command);
+    const shouldInterrupt = terminalActiveProgram === 'top';
+    lastTerminalCommand = command;
+    if (shouldInterrupt) {
+        terminalActiveProgram = '';
+        interruptTerminal().then(() => {
+            setTimeout(() => {
+                terminalActiveProgram = isTopCommand ? 'top' : '';
+                sendTerminalInput(command + '\n');
+            }, 250);
+        });
+    } else {
+        terminalActiveProgram = isTopCommand ? 'top' : '';
+        sendTerminalInput(command + '\n');
+    }
+}
+
+function stopTerminalSession(sendStopRequest) {
+    terminalSessionActive = false;
+    lastTerminalCommand = '';
+    terminalActiveProgram = '';
+    terminalFallbackNotified = false;
+    if (terminalPollingTimer) {
+        clearInterval(terminalPollingTimer);
+        terminalPollingTimer = null;
+    }
+    terminalPollingInFlight = false;
+    if (sendStopRequest === false) {
+        return;
+    }
+    fetch(API_BASE + '/api/terminal/stop', {
+        method: 'POST'
+    }).catch(() => {});
+}
+
 // 打开终端
 function openTerminal() {
     const window = document.getElementById('terminalWindow');
@@ -859,6 +1021,7 @@ function openTerminal() {
     bringWindowToFront('terminalWindow');
     registerWindow('terminalWindow');
     document.getElementById('terminalInput').focus();
+    startTerminalSession();
 }
 
 // 终端按键处理
@@ -876,28 +1039,38 @@ function handleTerminalKeyPress(event) {
 
 // 执行终端命令
 function executeTerminalCommand(command) {
-    const output = document.getElementById('terminalOutput');
-    output.innerHTML += '<div>$ ' + escapeHtml(command) + '</div>';
-    
-    fetch(API_BASE + '/api/command/execute', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'command=' + encodeURIComponent(command)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            output.innerHTML += '<div>' + escapeHtml(data.output) + '</div>';
-        } else {
-            output.innerHTML += '<div style="color: #ff4444;">错误: ' + escapeHtml(data.message) + '</div>';
+    if (terminalSessionActive) {
+        sendCommandToShell(command);
+        return;
+    }
+    startTerminalSession().then(active => {
+        if (active) {
+            sendCommandToShell(command);
+            return;
         }
-        output.scrollTop = output.scrollHeight;
-    })
-    .catch(error => {
-        output.innerHTML += '<div style="color: #ff4444;">错误: ' + escapeHtml(error.message) + '</div>';
-        output.scrollTop = output.scrollHeight;
+        if (!terminalFallbackNotified) {
+            appendTerminalOutput('提示: 交互终端未启动，命令以单次执行模式运行（cd 不会保持）。\n');
+            terminalFallbackNotified = true;
+        }
+        appendTerminalOutput('$ ' + command + '\n');
+        fetch(API_BASE + '/api/command/execute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'command=' + encodeURIComponent(command)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                appendTerminalOutput((data.output || '') + '\n');
+            } else {
+                appendTerminalOutput('错误: ' + (data.message || '未知错误') + '\n');
+            }
+        })
+        .catch(error => {
+            appendTerminalOutput('错误: ' + error.message + '\n');
+        });
     });
 }
 
@@ -905,6 +1078,9 @@ function executeTerminalCommand(command) {
 function closeWindow(windowId) {
     document.getElementById(windowId).classList.add('hidden');
     unregisterWindow(windowId);
+    if (windowId === 'terminalWindow') {
+        stopTerminalSession();
+    }
 }
 
 function minimizeWindow(windowId) {

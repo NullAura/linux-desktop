@@ -66,6 +66,40 @@
         <servlet-name>CommandExecuteServlet</servlet-name>
         <url-pattern>/api/command/execute</url-pattern>
     </servlet-mapping>
+
+    <!-- 终端会话Servlet -->
+    <servlet>
+        <servlet-name>TerminalStartServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.TerminalStartServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>TerminalStartServlet</servlet-name>
+        <url-pattern>/api/terminal/start</url-pattern>
+    </servlet-mapping>
+    <servlet>
+        <servlet-name>TerminalSendServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.TerminalSendServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>TerminalSendServlet</servlet-name>
+        <url-pattern>/api/terminal/send</url-pattern>
+    </servlet-mapping>
+    <servlet>
+        <servlet-name>TerminalPollServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.TerminalPollServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>TerminalPollServlet</servlet-name>
+        <url-pattern>/api/terminal/poll</url-pattern>
+    </servlet-mapping>
+    <servlet>
+        <servlet-name>TerminalStopServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.TerminalStopServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>TerminalStopServlet</servlet-name>
+        <url-pattern>/api/terminal/stop</url-pattern>
+    </servlet-mapping>
     
     <!-- 文件打开Servlet -->
     <servlet>

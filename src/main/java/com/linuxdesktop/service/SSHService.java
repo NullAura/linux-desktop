@@ -2,6 +2,7 @@ package com.linuxdesktop.service;
 
 import com.jcraft.jsch.*;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
 /**
@@ -14,6 +15,14 @@ public class SSHService {
     private String host;
     private int port;
     private String username;
+    private ChannelShell shellChannel;
+    private InputStream shellInput;
+    private OutputStream shellOutput;
+    private Thread shellReaderThread;
+    private final Object shellLock = new Object();
+    private StringBuilder shellBuffer = new StringBuilder();
+    private static final int SHELL_BUFFER_MAX = 200000;
+    private String lastShellError;
     
     private SSHService() {
     }
@@ -32,6 +41,7 @@ public class SSHService {
         try {
             // 如果已有连接，先断开
             if (session != null && session.isConnected()) {
+                stopShell();
                 session.disconnect();
             }
             
@@ -154,6 +164,7 @@ public class SSHService {
      */
     public void disconnect() {
         if (session != null && session.isConnected()) {
+            stopShell();
             session.disconnect();
         }
     }
@@ -239,6 +250,102 @@ public class SSHService {
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        }
+    }
+
+    public synchronized boolean startShell() {
+        if (!isConnected()) {
+            return false;
+        }
+        try {
+            lastShellError = null;
+            if (shellChannel != null && shellChannel.isConnected()) {
+                return true;
+            }
+            stopShell();
+            shellChannel = (ChannelShell) session.openChannel("shell");
+            shellChannel.setPtyType("xterm");
+            shellInput = shellChannel.getInputStream();
+            shellOutput = shellChannel.getOutputStream();
+            shellChannel.connect(5000);
+
+            shellReaderThread = new Thread(() -> {
+                byte[] buffer = new byte[4096];
+                try {
+                    int read;
+                    while (shellChannel != null && shellChannel.isConnected()
+                            && (read = shellInput.read(buffer)) != -1) {
+                        String chunk = new String(buffer, 0, read, StandardCharsets.UTF_8);
+                        synchronized (shellLock) {
+                            shellBuffer.append(chunk);
+                            if (shellBuffer.length() > SHELL_BUFFER_MAX) {
+                                shellBuffer.delete(0, shellBuffer.length() - SHELL_BUFFER_MAX);
+                            }
+                        }
+                    }
+                } catch (IOException ignored) {
+                    // 连接关闭或中断
+                }
+            }, "ssh-shell-reader");
+            shellReaderThread.setDaemon(true);
+            shellReaderThread.start();
+            return true;
+        } catch (Exception e) {
+            lastShellError = e.getMessage() != null ? e.getMessage() : e.toString();
+            e.printStackTrace();
+            stopShell();
+            return false;
+        }
+    }
+
+    public synchronized boolean isShellActive() {
+        return shellChannel != null && shellChannel.isConnected();
+    }
+
+    public String getLastShellError() {
+        return lastShellError;
+    }
+
+    public boolean sendShellInput(String input) {
+        if (!isShellActive() || input == null) {
+            return false;
+        }
+        try {
+            shellOutput.write(input.getBytes(StandardCharsets.UTF_8));
+            shellOutput.flush();
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    public String pollShellOutput() {
+        synchronized (shellLock) {
+            if (shellBuffer.length() == 0) {
+                return "";
+            }
+            String output = shellBuffer.toString();
+            shellBuffer.setLength(0);
+            return output;
+        }
+    }
+
+    public synchronized void stopShell() {
+        if (shellChannel != null) {
+            try {
+                shellChannel.disconnect();
+            } catch (Exception ignored) {
+            }
+        }
+        shellChannel = null;
+        shellInput = null;
+        shellOutput = null;
+        if (shellReaderThread != null) {
+            shellReaderThread.interrupt();
+            shellReaderThread = null;
+        }
+        synchronized (shellLock) {
+            shellBuffer.setLength(0);
         }
     }
 }
