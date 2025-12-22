@@ -460,14 +460,42 @@ body:not(.taskbar-top) .desktop {
 }
 
 /* 终端 */
+#terminalWindow .window-header {
+    background: linear-gradient(180deg, #2b2f36 0%, #1f2329 100%);
+    border-bottom: 1px solid #15181d;
+    color: #e6e9ef;
+}
+
+#terminalWindow .window-title {
+    letter-spacing: 0.4px;
+}
+
+#terminalWindow .window-content {
+    padding: 0;
+    background: #0e1116;
+    display: flex;
+    flex-direction: column;
+}
+
+#terminalWindow .window-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#terminalWindow .window-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
 .terminal-output {
-    background: #1e1e1e;
-    color: #00ff00;
-    padding: 15px;
-    font-family: 'Courier New', monospace;
+    background: #0e1116;
+    color: #e6e9ef;
+    padding: 18px 18px 12px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
     font-size: 14px;
-    min-height: 300px;
-    max-height: 500px;
+    line-height: 1.5;
+    min-height: 0;
+    max-height: none;
+    flex: 1;
     overflow-y: auto;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -476,29 +504,36 @@ body:not(.taskbar-top) .desktop {
 .terminal-input-line {
     display: flex;
     align-items: center;
-    background: #1e1e1e;
-    padding: 10px;
-    border-top: 1px solid #333;
+    background: #0e1116;
+    padding: 12px 18px 16px;
+    border-top: 1px solid #1c2128;
 }
 
 .terminal-prompt {
-    color: #00ff00;
-    margin-right: 10px;
-    font-family: 'Courier New', monospace;
+    color: #8ff0a4;
+    margin-right: 8px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
 .terminal-input {
     flex: 1;
     background: transparent;
     border: none;
-    color: #00ff00;
-    font-family: 'Courier New', monospace;
+    color: #e6e9ef;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace;
     font-size: 14px;
     outline: none;
+    caret-color: #8ff0a4;
 }
 
 .terminal-input::placeholder {
-    color: #666;
+    color: #707885;
+}
+
+#terminalWindow .terminal-output::selection,
+#terminalWindow .terminal-output *::selection,
+#terminalWindow .terminal-input::selection {
+    background: rgba(120, 140, 180, 0.35);
 }
 
 /* 对话框 */
