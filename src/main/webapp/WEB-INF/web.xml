@@ -119,6 +119,22 @@
         <url-pattern>/api/file/open</url-pattern>
     </servlet-mapping>
     <servlet>
+        <servlet-name>FileSaveServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.FileSaveServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>FileSaveServlet</servlet-name>
+        <url-pattern>/api/file/save</url-pattern>
+    </servlet-mapping>
+    <servlet>
+        <servlet-name>FileDeleteServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.FileDeleteServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>FileDeleteServlet</servlet-name>
+        <url-pattern>/api/file/delete</url-pattern>
+    </servlet-mapping>
+    <servlet>
         <servlet-name>FileCreateServlet</servlet-name>
         <servlet-class>com.linuxdesktop.servlet.FileCreateServlet</servlet-class>
     </servlet>

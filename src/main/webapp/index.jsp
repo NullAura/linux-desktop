@@ -170,7 +170,10 @@
             </div>
         </div>
         <div class="window-content">
-            <pre id="fileViewerContent" class="file-viewer-content"></pre>
+            <div class="file-viewer-toolbar">
+                <button onclick="saveFileViewerContent()">💾 保存</button>
+            </div>
+            <textarea id="fileViewerContent" class="file-viewer-content" spellcheck="false"></textarea>
         </div>
     </div>
 

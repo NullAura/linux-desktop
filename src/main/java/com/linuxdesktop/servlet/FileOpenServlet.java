@@ -10,6 +10,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -46,12 +47,18 @@ public class FileOpenServlet extends HttpServlet {
                     result.put("content", content);
                     result.put("type", "text");
                 } else if ("edit".equals(action)) {
-                    // 读取完整文件内容用于编辑
-                    String command = "cat '" + filePath + "'";
-                    String content = sshService.executeCommand(command);
-                    result.put("success", true);
-                    result.put("content", content);
-                    result.put("type", "edit");
+                    String fileTypeCmd = "file -b '" + filePath + "'";
+                    String fileType = sshService.executeCommand(fileTypeCmd).trim();
+                    if (isTextFileType(fileType)) {
+                        String command = "cat '" + filePath + "'";
+                        String content = sshService.executeCommand(command);
+                        result.put("success", true);
+                        result.put("content", content);
+                        result.put("type", "edit");
+                    } else {
+                        result.put("success", false);
+                        result.put("message", "不支持的文件类型: " + fileType);
+                    }
                 } else if ("execute".equals(action)) {
                     // 执行可执行文件
                     String command = "'" + filePath + "'";
@@ -64,7 +71,7 @@ public class FileOpenServlet extends HttpServlet {
                     String fileTypeCmd = "file -b '" + filePath + "'";
                     String fileType = sshService.executeCommand(fileTypeCmd).trim();
                     
-                    if (fileType.contains("text") || fileType.contains("ASCII")) {
+                    if (isTextFileType(fileType)) {
                         String command = "head -n 1000 '" + filePath + "'";
                         String content = sshService.executeCommand(command);
                         result.put("success", true);
@@ -84,5 +91,17 @@ public class FileOpenServlet extends HttpServlet {
         PrintWriter out = response.getWriter();
         out.print(new Gson().toJson(result));
         out.flush();
+    }
+
+    private boolean isTextFileType(String fileType) {
+        if (fileType == null) {
+            return false;
+        }
+        String fileTypeLower = fileType.toLowerCase(Locale.ROOT);
+        return fileTypeLower.contains("text")
+                || fileTypeLower.contains("ascii")
+                || fileTypeLower.contains("utf-8")
+                || fileTypeLower.contains("unicode")
+                || fileTypeLower.contains("empty");
     }
 }

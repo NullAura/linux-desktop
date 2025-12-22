@@ -17,6 +17,7 @@ let terminalCwd = '';
 let terminalHome = '';
 let terminalPrompt = '#';
 let terminalInitPending = false;
+let fileViewerPath = '';
 const windowMeta = {
     fileManagerWindow: { title: '文件管理器', icon: '📁' },
     processWindow: { title: '进程管理', icon: '⚙️' },
@@ -595,13 +596,13 @@ function openFile(filePath) {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: 'path=' + encodeURIComponent(filePath)
+        body: 'path=' + encodeURIComponent(filePath) + '&action=edit'
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            if (data.type === 'text') {
-                openFileViewer(filePath, data.content);
+            if (data.type === 'text' || data.type === 'edit') {
+                openFileViewer(filePath, data.content || '');
             } else {
                 alert('文件内容:\n' + data.content);
             }
@@ -618,11 +619,21 @@ function openFile(filePath) {
 function openFileViewer(filePath, content) {
     const window = document.getElementById('fileViewerWindow');
     document.getElementById('fileViewerTitle').textContent = '文件查看器 - ' + filePath;
-    document.getElementById('fileViewerContent').textContent = content;
+    const contentInput = document.getElementById('fileViewerContent');
+    fileViewerPath = filePath;
+    contentInput.value = content || '';
+    contentInput.onkeydown = handleFileViewerKeyDown;
     window.classList.remove('hidden');
     ensureWindowPosition('fileViewerWindow', 3);
     bringWindowToFront('fileViewerWindow');
     registerWindow('fileViewerWindow');
+}
+
+function handleFileViewerKeyDown(event) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        saveFileViewerContent();
+    }
 }
 
 // 显示文件右键菜单
@@ -635,6 +646,7 @@ function showFileContextMenu(event, filePath, fileType) {
     menu.innerHTML = `
         <div class="context-menu-item" onclick="handleFileOpenAction('${filePath.replace(/'/g, "\\'")}', '${fileType}')">打开</div>
         <div class="context-menu-item" onclick="showFileProperty('${filePath.replace(/'/g, "\\'")}')">属性</div>
+        <div class="context-menu-item" onclick="promptDeleteFileItem('${filePath.replace(/'/g, "\\'")}', '${fileType}')">删除</div>
     `;
     
     menu.style.left = event.pageX + 'px';
@@ -648,6 +660,39 @@ function showFileContextMenu(event, filePath, fileType) {
             document.removeEventListener('click', closeMenu);
         });
     }, 100);
+}
+
+function promptDeleteFileItem(filePath, fileType) {
+    const isDir = fileType === 'directory';
+    const label = isDir ? '确认删除文件夹及其内容？' : '确认删除该文件？';
+    if (!confirm(label)) {
+        return;
+    }
+    deleteFileItem(filePath);
+}
+
+function deleteFileItem(filePath) {
+    const payload = 'path=' + encodeURIComponent(filePath);
+    fetch(API_BASE + '/api/file/delete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: payload
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('删除成功', 'success');
+            loadFileList(getCurrentDirectory());
+            refreshDesktopFiles();
+        } else {
+            showMessage('删除失败: ' + (data.message || '未知错误'), 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('删除失败: ' + error.message, 'error');
+    });
 }
 
 function handleFileOpenAction(filePath, fileType) {
@@ -993,6 +1038,46 @@ function refreshDesktopFiles() {
 // 关闭属性对话框
 function closePropertyDialog() {
     document.getElementById('propertyDialog').classList.add('hidden');
+}
+
+function saveFileViewerContent() {
+    const contentInput = document.getElementById('fileViewerContent');
+    if (!fileViewerPath || !contentInput) {
+        showMessage('未打开可保存的文件', 'error');
+        return;
+    }
+    const encoded = encodeBase64Utf8(contentInput.value || '');
+    const payload = 'path=' + encodeURIComponent(fileViewerPath) +
+        '&contentBase64=' + encodeURIComponent(encoded);
+    fetch(API_BASE + '/api/file/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: payload
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('文件已保存', 'success');
+            refreshDesktopFiles();
+        } else {
+            showMessage('保存失败: ' + (data.message || '未知错误'), 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('保存失败: ' + error.message, 'error');
+    });
+}
+
+function encodeBase64Utf8(text) {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(text);
+    let binary = '';
+    bytes.forEach(byte => {
+        binary += String.fromCharCode(byte);
+    });
+    return btoa(binary);
 }
 
 // 打开进程管理
@@ -1622,6 +1707,8 @@ function closeWindow(windowId) {
     unregisterWindow(windowId);
     if (windowId === 'terminalWindow') {
         stopTerminalSession();
+    } else if (windowId === 'fileViewerWindow') {
+        fileViewerPath = '';
     }
 }
 
