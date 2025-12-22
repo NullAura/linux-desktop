@@ -3,6 +3,13 @@ let currentPath = '~';
 let fileManagerHistory = [];
 let selectedFile = null;
 let zIndex = 100;
+const windowMeta = {
+    fileManagerWindow: { title: '文件管理器', icon: '📁' },
+    processWindow: { title: '进程管理', icon: '⚙️' },
+    terminalWindow: { title: '终端', icon: '💻' },
+    fileViewerWindow: { title: '文件查看器', icon: '📄' }
+};
+const openWindows = new Map();
 
 // 获取应用上下文路径
 function getContextPath() {
@@ -29,6 +36,12 @@ document.addEventListener('DOMContentLoaded', function() {
         connectSSH();
     });
     
+    // 密码明文切换
+    const togglePasswordBtn = document.getElementById('togglePassword');
+    if (togglePasswordBtn) {
+        togglePasswordBtn.addEventListener('click', togglePasswordVisibility);
+    }
+    
     // 检查SSH连接状态并切换页面
     checkSSHConnection().then(connected => {
         switchPage(connected);
@@ -39,6 +52,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始化右键菜单
     initContextMenu();
+    
+    // 任务栏时钟
+    startTaskbarClock();
 });
 
 // 切换页面显示
@@ -72,6 +88,7 @@ function updateConnectionStatus(connected, username, host) {
         statusElement.classList.remove('connected');
         // 切换到连接页面
         switchPage(false);
+        clearOpenWindows();
     }
 }
 
@@ -142,6 +159,106 @@ function showSSHDialog() {
 function disconnectSSH() {
     // 可以添加断开连接的逻辑
     updateConnectionStatus(false);
+}
+
+// 切换任务栏位置（顶部/底部）
+function toggleTaskbarPosition() {
+    const taskbar = document.querySelector('.taskbar');
+    if (!taskbar) return;
+    const isTop = taskbar.classList.toggle('taskbar-top');
+    document.body.classList.toggle('taskbar-top', isTop);
+}
+
+// 任务栏窗口列表渲染
+function renderTaskbarWindows() {
+    const container = document.getElementById('taskbarWindows');
+    if (!container) return;
+    container.innerHTML = '';
+    openWindows.forEach((meta, id) => {
+        const btn = document.createElement('button');
+        btn.className = 'taskbar-window-btn';
+        const windowEl = document.getElementById(id);
+        const isVisible = windowEl && !windowEl.classList.contains('hidden');
+        if (isVisible) {
+            btn.classList.add('active');
+        }
+        btn.innerHTML = `
+            <span class="taskbar-window-icon">${meta.icon}</span>
+            <span class="taskbar-window-title">${meta.title}</span>
+        `;
+        btn.addEventListener('click', () => {
+            if (windowEl) {
+                windowEl.classList.remove('hidden');
+                bringWindowToFront(id);
+                renderTaskbarWindows();
+            }
+        });
+        container.appendChild(btn);
+    });
+}
+
+function registerWindow(windowId) {
+    if (windowMeta[windowId]) {
+        openWindows.set(windowId, windowMeta[windowId]);
+        renderTaskbarWindows();
+    }
+}
+
+function unregisterWindow(windowId) {
+    if (openWindows.has(windowId)) {
+        openWindows.delete(windowId);
+        renderTaskbarWindows();
+    }
+}
+
+function clearOpenWindows() {
+    openWindows.clear();
+    renderTaskbarWindows();
+}
+
+function ensureWindowPosition(windowId, offsetIndex) {
+    const windowEl = document.getElementById(windowId);
+    if (!windowEl) return;
+    const positioned = windowEl.dataset.positioned === 'true';
+    if (!positioned) {
+        const baseTop = 80 + (offsetIndex || 0) * 30;
+        const baseLeft = 120 + (offsetIndex || 0) * 30;
+        windowEl.style.top = baseTop + 'px';
+        windowEl.style.left = baseLeft + 'px';
+        windowEl.style.transform = '';
+        windowEl.dataset.positioned = 'true';
+    }
+}
+
+// 任务栏时钟
+function startTaskbarClock() {
+    const clockEl = document.getElementById('taskbarClock');
+    if (!clockEl) return;
+    const update = () => {
+        const now = new Date();
+        const h = now.getHours().toString().padStart(2, '0');
+        const m = now.getMinutes().toString().padStart(2, '0');
+        const d = now.getDate().toString().padStart(2, '0');
+        const mon = (now.getMonth() + 1).toString().padStart(2, '0');
+        clockEl.textContent = `${h}:${m}  ${mon}-${d}`;
+    };
+    update();
+    setInterval(update, 1000);
+}
+
+// 切换密码明文显示
+function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('password');
+    const toggleBtn = document.getElementById('togglePassword');
+    if (!passwordInput || !toggleBtn) {
+        return;
+    }
+    const showPassword = passwordInput.type === 'password';
+    passwordInput.type = showPassword ? 'text' : 'password';
+    const isVisible = showPassword;
+    toggleBtn.classList.toggle('is-hidden', !isVisible);
+    toggleBtn.setAttribute('aria-label', isVisible ? '隐藏密码' : '显示密码');
+    toggleBtn.setAttribute('title', isVisible ? '隐藏密码' : '显示密码');
 }
 
 // 连接SSH
@@ -287,7 +404,9 @@ function openFileManager() {
         
         const window = document.getElementById('fileManagerWindow');
         window.classList.remove('hidden');
+        ensureWindowPosition('fileManagerWindow', 0);
         bringWindowToFront('fileManagerWindow');
+        registerWindow('fileManagerWindow');
         fileManagerGoHome();
     });
 }
@@ -463,7 +582,9 @@ function openFileViewer(filePath, content) {
     document.getElementById('fileViewerTitle').textContent = '文件查看器 - ' + filePath;
     document.getElementById('fileViewerContent').textContent = content;
     window.classList.remove('hidden');
+    ensureWindowPosition('fileViewerWindow', 3);
     bringWindowToFront('fileViewerWindow');
+    registerWindow('fileViewerWindow');
 }
 
 // 显示文件右键菜单
@@ -566,7 +687,9 @@ function closePropertyDialog() {
 function openProcessManager() {
     const window = document.getElementById('processWindow');
     window.classList.remove('hidden');
+    ensureWindowPosition('processWindow', 2);
     bringWindowToFront('processWindow');
+    registerWindow('processWindow');
     refreshProcessList();
 }
 
@@ -622,7 +745,9 @@ function refreshProcessList() {
 function openTerminal() {
     const window = document.getElementById('terminalWindow');
     window.classList.remove('hidden');
+    ensureWindowPosition('terminalWindow', 1);
     bringWindowToFront('terminalWindow');
+    registerWindow('terminalWindow');
     document.getElementById('terminalInput').focus();
 }
 
@@ -669,6 +794,7 @@ function executeTerminalCommand(command) {
 // 窗口管理
 function closeWindow(windowId) {
     document.getElementById(windowId).classList.add('hidden');
+    unregisterWindow(windowId);
 }
 
 function minimizeWindow(windowId) {

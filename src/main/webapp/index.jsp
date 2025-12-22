@@ -33,7 +33,12 @@
                     </div>
                     <div class="form-group">
                         <label>密码:</label>
-                        <input type="password" id="password" name="password" required>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="password" name="password" required>
+                            <button type="button" id="togglePassword" class="toggle-password-btn is-hidden" aria-label="显示密码" title="显示密码">
+                                <span class="eye-icon" aria-hidden="true"></span>
+                            </button>
+                        </div>
                     </div>
                     <div class="form-buttons">
                         <button type="submit" id="connectBtn">连接</button>
@@ -65,7 +70,14 @@
                 <span>💻</span> 终端
             </button>
         </div>
+        <div class="taskbar-center taskbar-windows" id="taskbarWindows">
+            <!-- 打开的窗口会显示在这里 -->
+        </div>
         <div class="taskbar-right">
+            <button class="taskbar-btn ghost" type="button" onclick="toggleTaskbarPosition()" title="切换任务栏位置（顶部/底部）">
+                ⬍
+            </button>
+            <span id="taskbarClock" class="taskbar-clock">--:--</span>
             <span id="connectionStatus" class="status-indicator">未连接</span>
         </div>
     </div>

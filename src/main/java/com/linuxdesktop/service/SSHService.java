@@ -41,7 +41,14 @@ public class SSHService {
             
             Properties config = new Properties();
             config.put("StrictHostKeyChecking", "no");
-            config.put("PreferredAuthentications", "password");
+            // 兼容大多数 sshd 的密码/质询认证和常见算法（过滤掉 JSch 0.1.55 不支持的 curve25519/ed25519，避免 NPE）
+            config.put("PreferredAuthentications", "password,keyboard-interactive");
+            config.put("server_host_key", "ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,ssh-rsa");
+            config.put("kex", "diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha256,diffie-hellman-group14-sha1,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521");
+            config.put("cipher.c2s", "aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,3des-cbc");
+            config.put("cipher.s2c", "aes128-ctr,aes192-ctr,aes256-ctr,aes128-cbc,3des-cbc");
+            config.put("mac.c2s", "hmac-sha2-256,hmac-sha2-512,hmac-sha1");
+            config.put("mac.s2c", "hmac-sha2-256,hmac-sha2-512,hmac-sha1");
             session.setConfig(config);
             
             // 设置连接超时为30秒

@@ -6,7 +6,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #2c3e50;
+    background: #0b1224;
     height: 100vh;
     overflow: hidden;
     margin: 0;
@@ -16,28 +16,40 @@ body {
 /* 任务栏 */
 .taskbar {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    inset: auto 0 0 0;
     height: 50px;
-    background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(10px);
+    background: rgba(12, 22, 44, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(16px) saturate(140%);
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0 20px;
     z-index: 1000;
+    transition: all 0.2s ease;
 }
 
 .taskbar-left {
     display: flex;
     gap: 10px;
+    align-items: center;
+}
+
+.taskbar-center {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 0 12px;
 }
 
 .taskbar-btn {
     padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.12));
+    border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 5px;
     color: white;
     cursor: pointer;
@@ -48,33 +60,160 @@ body {
 }
 
 .taskbar-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.16));
+    transform: translateY(-1px);
 }
 
 .taskbar-right {
     color: white;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .status-indicator {
     padding: 5px 10px;
-    background: rgba(255, 0, 0, 0.3);
-    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
     font-size: 12px;
+    color: #e9eefb;
 }
 
 .status-indicator.connected {
-    background: rgba(0, 255, 0, 0.3);
+    background: rgba(46, 204, 113, 0.25);
+    border-color: rgba(46, 204, 113, 0.35);
+}
+
+.taskbar-clock {
+    color: #e9eefb;
+    font-variant-numeric: tabular-nums;
+    margin-right: 10px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    white-space: nowrap;
+    line-height: 1.2;
+    text-align: right;
+}
+
+.taskbar-right .taskbar-btn.ghost {
+    order: 0;
+}
+
+.taskbar-clock {
+    order: 1;
+}
+
+.status-indicator {
+    order: 2;
+}
+
+.taskbar-btn.ghost {
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #e9eefb;
+}
+
+.taskbar-btn.ghost:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.taskbar-windows {
+    display: flex;
+    gap: 8px;
+}
+
+.taskbar-window-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 6px;
+    color: #e9eefb;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.taskbar-window-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.taskbar-window-btn.active {
+    background: rgba(80, 168, 255, 0.25);
+    border-color: rgba(80, 168, 255, 0.4);
+    box-shadow: 0 4px 10px rgba(80, 168, 255, 0.25);
+}
+
+.taskbar-window-icon {
+    font-size: 16px;
+}
+
+.taskbar-window-title {
+    font-size: 14px;
+}
+
+.taskbar.taskbar-top {
+    top: 0;
+    bottom: auto;
+    border-top: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
 /* 桌面 */
 .desktop {
     width: 100%;
     height: calc(100vh - 50px);
-    padding: 20px;
+    padding: 70px 20px 80px 20px;
     overflow: hidden;
     position: relative;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background:
+        radial-gradient(circle at 18% 20%, rgba(99, 179, 237, 0.22), transparent 28%),
+        radial-gradient(circle at 80% 24%, rgba(236, 72, 153, 0.18), transparent 24%),
+        radial-gradient(circle at 32% 68%, rgba(45, 212, 191, 0.18), transparent 26%),
+        radial-gradient(circle at 78% 72%, rgba(255, 214, 102, 0.14), transparent 26%),
+        linear-gradient(135deg, #0b1224 0%, #0e1b3a 46%, #0d3f73 100%);
+}
+
+body.taskbar-top .desktop {
+    padding-top: 90px;
+    padding-bottom: 50px;
+}
+
+body:not(.taskbar-top) .desktop {
+    padding-bottom: 90px;
+}
+
+.desktop::before {
+    content: '';
+    position: absolute;
+    inset: -25%;
+    background:
+        radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.12), transparent 40%),
+        radial-gradient(ellipse at 70% 70%, rgba(255, 255, 255, 0.08), transparent 38%);
+    filter: blur(35px);
+    opacity: 0.8;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.desktop::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(0, 0, 0, 0.25) 100%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.desktop > * {
+    position: relative;
+    z-index: 1;
 }
 
 .desktop-icon {
@@ -127,9 +266,14 @@ body {
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
-    min-width: 600px;
-    min-height: 400px;
+    width: 760px;
+    height: 520px;
+    min-width: 620px;
+    min-height: 420px;
+    max-width: calc(100vw - 40px);
+    max-height: calc(100vh - 140px);
     z-index: 100;
+    overflow: hidden;
 }
 
 .window.hidden {

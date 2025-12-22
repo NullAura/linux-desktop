@@ -49,6 +49,83 @@
     text-align: center;
 }
 
+.password-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.password-input-wrapper input {
+    flex: 1;
+}
+
+.toggle-password-btn {
+    width: 44px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: #f1f1f1;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #555;
+}
+
+.toggle-password-btn:hover {
+    background: #e9e9e9;
+}
+
+.toggle-password-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3);
+}
+
+.eye-icon {
+    position: relative;
+    width: 18px;
+    height: 12px;
+    border: 2px solid #555;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    box-sizing: border-box;
+}
+
+.eye-icon::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    margin-top: -3px;
+    margin-left: -3px;
+    background: #555;
+    border-radius: 50%;
+}
+
+.eye-icon::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 7px;
+    width: 2px;
+    height: 20px;
+    background: #d9534f;
+    transform: rotate(45deg);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.toggle-password-btn.is-hidden .eye-icon::before {
+    opacity: 1;
+}
+
+.toggle-password-btn:active {
+    transform: translateY(1px);
+}
+
 /* 桌面页面 */
 .desktop-page {
     width: 100%;
