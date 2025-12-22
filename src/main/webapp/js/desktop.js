@@ -16,6 +16,7 @@ let terminalFallbackNotified = false;
 let terminalCwd = '';
 let terminalHome = '';
 let terminalPrompt = '#';
+let terminalInitPending = false;
 const windowMeta = {
     fileManagerWindow: { title: '文件管理器', icon: '📁' },
     processWindow: { title: '进程管理', icon: '⚙️' },
@@ -65,6 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始化右键菜单
     initContextMenu();
+    initFileManagerContextMenu();
     
     // 任务栏时钟
     startTaskbarClock();
@@ -130,6 +132,13 @@ function checkSSHConnection() {
             return response.json();
         })
         .then(data => {
+            if (data && data.connected) {
+                if (data.desktopPath) {
+                    window.desktopPath = data.desktopPath;
+                }
+            } else {
+                window.desktopPath = null;
+            }
             updateConnectionStatus(data.connected, data.username, data.host);
             return data.connected;
         })
@@ -415,7 +424,7 @@ function isSSHConnected() {
 }
 
 // 打开文件管理器
-function openFileManager() {
+function openFileManager(targetPath) {
     // 检查是否已连接SSH（使用异步检查以确保准确性）
     checkSSHConnection().then(() => {
         const connected = isSSHConnected();
@@ -430,7 +439,13 @@ function openFileManager() {
         ensureWindowPosition('fileManagerWindow', 0);
         bringWindowToFront('fileManagerWindow');
         registerWindow('fileManagerWindow');
-        fileManagerGoHome();
+        if (targetPath) {
+            currentPath = targetPath;
+            fileManagerHistory = [];
+            loadFileList(currentPath);
+        } else {
+            fileManagerGoHome();
+        }
     });
 }
 
@@ -618,7 +633,7 @@ function showFileContextMenu(event, filePath, fileType) {
     const menu = document.getElementById('contextMenu') || createContextMenu();
     
     menu.innerHTML = `
-        <div class="context-menu-item" onclick="openFile('${filePath.replace(/'/g, "\\'")}')">打开</div>
+        <div class="context-menu-item" onclick="handleFileOpenAction('${filePath.replace(/'/g, "\\'")}', '${fileType}')">打开</div>
         <div class="context-menu-item" onclick="showFileProperty('${filePath.replace(/'/g, "\\'")}')">属性</div>
     `;
     
@@ -627,6 +642,33 @@ function showFileContextMenu(event, filePath, fileType) {
     menu.classList.add('show');
     
     // 点击其他地方关闭菜单
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenu() {
+            menu.classList.remove('show');
+            document.removeEventListener('click', closeMenu);
+        });
+    }, 100);
+}
+
+function handleFileOpenAction(filePath, fileType) {
+    if (fileType === 'directory') {
+        openFileManager(filePath);
+        return;
+    }
+    openFile(filePath);
+}
+
+function showFileManagerContextMenu(event) {
+    const menu = document.getElementById('contextMenu') || createContextMenu();
+    menu.innerHTML = `
+        <div class="context-menu-item" onclick="promptCreateFileItem('directory')">新建文件夹</div>
+        <div class="context-menu-item" onclick="promptCreateFileItem('file')">新建文件</div>
+        <div class="context-menu-item" onclick="fileManagerRefresh()">刷新</div>
+    `;
+    menu.style.left = event.pageX + 'px';
+    menu.style.top = event.pageY + 'px';
+    menu.classList.add('show');
+
     setTimeout(() => {
         document.addEventListener('click', function closeMenu() {
             menu.classList.remove('show');
@@ -649,6 +691,19 @@ function initContextMenu() {
     createContextMenu();
 }
 
+function initFileManagerContextMenu() {
+    const content = document.getElementById('fileManagerContent');
+    if (!content) return;
+    content.addEventListener('contextmenu', (event) => {
+        if (event.target.closest('.file-item')) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        showFileManagerContextMenu(event);
+    });
+}
+
 // 初始化桌面右键菜单
 function initDesktopContextMenu() {
     const desktop = document.getElementById('desktop');
@@ -667,6 +722,8 @@ function initDesktopContextMenu() {
 function showDesktopContextMenu(event) {
     const menu = document.getElementById('contextMenu') || createContextMenu();
     menu.innerHTML = `
+        <div class="context-menu-item" onclick="promptCreateFileItem('directory', getDesktopDirectoryFallback())">新建文件夹</div>
+        <div class="context-menu-item" onclick="promptCreateFileItem('file', getDesktopDirectoryFallback())">新建文件</div>
         <div class="context-menu-item" onclick="triggerWallpaperPicker()">更换背景...</div>
         <div class="context-menu-item" onclick="resetDesktopBackground()">恢复默认背景</div>
         <div class="context-menu-item" onclick="sortDesktopIconsByName(false)">图标按名称排序</div>
@@ -805,6 +862,134 @@ function showFileProperty(filePath) {
         });
 }
 
+function promptCreateFileItem(type, targetDir) {
+    const label = type === 'directory' ? '新建文件夹' : '新建文件';
+    const name = prompt(label + '名称');
+    if (name === null) {
+        return;
+    }
+    const trimmed = name.trim();
+    if (!trimmed) {
+        showMessage('名称不能为空', 'error');
+        return;
+    }
+    if (!isValidFileName(trimmed)) {
+        showMessage('名称不能包含 / 或 \\', 'error');
+        return;
+    }
+    createFileItem(trimmed, type, targetDir);
+}
+
+function createFileItem(name, type, targetDir) {
+    const dir = targetDir || getCurrentDirectory();
+    const path = joinPath(dir, name);
+    const payload = 'path=' + encodeURIComponent(path) + '&type=' + encodeURIComponent(type);
+    fetch(API_BASE + '/api/file/create', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: payload
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(type === 'directory' ? '文件夹已创建' : '文件已创建', 'success');
+            loadFileList(dir);
+            refreshDesktopFiles();
+        } else {
+            showMessage('创建失败: ' + (data.message || '未知错误'), 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('创建失败: ' + error.message, 'error');
+    });
+}
+
+function getCurrentDirectory() {
+    const input = document.getElementById('filePathInput');
+    if (input && input.value) {
+        return input.value.trim();
+    }
+    return currentPath || '~';
+}
+
+function getDesktopDirectory() {
+    return window.desktopPath || '';
+}
+
+function getDesktopDirectoryFallback() {
+    return window.desktopPath || '~/Desktop';
+}
+
+function joinPath(base, name) {
+    if (!base) {
+        return name;
+    }
+    if (base.endsWith('/')) {
+        return base + name;
+    }
+    return base + '/' + name;
+}
+
+function isValidFileName(name) {
+    if (!name || name === '.' || name === '..') {
+        return false;
+    }
+    return !/[\\/]/.test(name);
+}
+
+function refreshDesktopFiles() {
+    const desktop = document.getElementById('desktop');
+    if (!desktop) return;
+    const isConnected = document.getElementById('connectionStatus') &&
+                       document.getElementById('connectionStatus').classList.contains('connected');
+    if (!isConnected) return;
+    const desktopDir = getDesktopDirectory();
+    if (!desktopDir) {
+        layoutDesktopIcons(Array.from(desktop.querySelectorAll('.desktop-icon')));
+        return;
+    }
+    fetch(`${API_BASE}/api/file/list?path=${encodeURIComponent(desktopDir)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success || !Array.isArray(data.files)) {
+                layoutDesktopIcons(Array.from(desktop.querySelectorAll('.desktop-icon')));
+                return;
+            }
+            desktop.querySelectorAll('.desktop-icon.desktop-file').forEach(node => {
+                node.remove();
+            });
+            data.files.forEach(file => {
+                if (file.name === '.' || file.name === '..') {
+                    return;
+                }
+                const icon = document.createElement('div');
+                icon.className = 'desktop-icon desktop-file';
+                icon.dataset.filePath = file.path;
+                icon.dataset.fileType = file.type;
+                icon.dataset.fileName = file.name;
+                icon.addEventListener('click', (event) => desktopFileClick(icon, event));
+                icon.addEventListener('contextmenu', (event) => {
+                    showFileContextMenu(event, file.path, file.type);
+                });
+                const iconGlyph = document.createElement('div');
+                iconGlyph.className = 'desktop-icon-icon';
+                iconGlyph.textContent = file.isDirectory ? '📁' : '📄';
+                const label = document.createElement('div');
+                label.className = 'desktop-icon-label';
+                label.textContent = file.name;
+                icon.appendChild(iconGlyph);
+                icon.appendChild(label);
+                desktop.appendChild(icon);
+            });
+            layoutDesktopIcons(Array.from(desktop.querySelectorAll('.desktop-icon')));
+        })
+        .catch(() => {
+            layoutDesktopIcons(Array.from(desktop.querySelectorAll('.desktop-icon')));
+        });
+}
+
 // 关闭属性对话框
 function closePropertyDialog() {
     document.getElementById('propertyDialog').classList.add('hidden');
@@ -910,12 +1095,35 @@ function stripTerminalMarkers(text) {
         promptCount++;
         return '';
     });
+    cleaned = filterTerminalInitNoise(cleaned);
     if (promptCount > 0) {
+        terminalInitPending = false;
         if (!getTerminalInlineInput()) {
             renderTerminalPromptLine();
         }
     }
     return cleaned;
+}
+
+function filterTerminalInitNoise(text) {
+    if (!terminalInitPending || !text) {
+        return text;
+    }
+    const lines = text.split('\n');
+    const filtered = lines.filter(line => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+            return true;
+        }
+        if (trimmed.includes('stty -echo')) {
+            return false;
+        }
+        if (trimmed.includes('export PS1=')) {
+            return false;
+        }
+        return true;
+    });
+    return filtered.join('\n');
 }
 
 function appendTerminalText(text, className) {
@@ -1049,6 +1257,7 @@ function updateTerminalPrompt() {
 }
 
 function initializeShellPrompt() {
+    terminalInitPending = true;
     sendTerminalInput('stty -echo\n', true);
     sendTerminalInput('export PS1="' + TERMINAL_PROMPT_MARKER + '"\n', true);
 }
@@ -1190,6 +1399,7 @@ function stopTerminalSession(sendStopRequest) {
     terminalFallbackNotified = false;
     terminalCwd = '';
     terminalPrompt = '#';
+    terminalInitPending = false;
     if (terminalPollingTimer) {
         clearInterval(terminalPollingTimer);
         terminalPollingTimer = null;
@@ -1549,7 +1759,7 @@ function initDesktopIcons() {
     });
     
     desktop.innerHTML = html;
-    layoutDesktopIcons(Array.from(desktop.querySelectorAll('.desktop-icon')));
+    refreshDesktopFiles();
 }
 
 function layoutDesktopIcons(icons) {
@@ -1601,11 +1811,8 @@ function desktopIconClick(appId) {
         desktopIconClickTimers[appId] = 0;
     } else {
         // 单击选中
-        document.querySelectorAll('.desktop-icon').forEach(i => {
-            i.classList.remove('selected');
-        });
         const icon = document.querySelector(`[data-app-id="${appId}"]`);
-        if (icon) icon.classList.add('selected');
+        selectDesktopIcon(icon);
         desktopIconClickTimers[appId] = now;
     }
 }
@@ -1624,6 +1831,30 @@ function desktopIconDoubleClick(appId) {
             break;
         default:
             console.log('Unknown app:', appId);
+    }
+}
+
+function desktopFileClick(element, event) {
+    event.preventDefault();
+    event.stopPropagation();
+    selectDesktopIcon(element);
+    if (event.detail === 2) {
+        const filePath = element.dataset.filePath;
+        const fileType = element.dataset.fileType;
+        if (fileType === 'directory') {
+            openFileManager(filePath);
+        } else {
+            openFile(filePath);
+        }
+    }
+}
+
+function selectDesktopIcon(element) {
+    document.querySelectorAll('.desktop-icon').forEach(i => {
+        i.classList.remove('selected');
+    });
+    if (element) {
+        element.classList.add('selected');
     }
 }
 

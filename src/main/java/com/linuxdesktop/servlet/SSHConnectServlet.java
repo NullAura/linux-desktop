@@ -87,6 +87,23 @@ public class SSHConnectServlet extends HttpServlet {
         if (sshService.isConnected()) {
             result.put("host", sshService.getHost());
             result.put("username", sshService.getUsername());
+            HttpSession session = request.getSession();
+            Object desktopPath = session.getAttribute("desktopPath");
+            if (desktopPath == null) {
+                String ensured = sshService.ensureDesktopFolder();
+                if (ensured != null) {
+                    session.setAttribute("desktopPath", ensured);
+                    desktopPath = ensured;
+                }
+            }
+            if (desktopPath != null) {
+                result.put("desktopPath", desktopPath.toString());
+            }
+        } else {
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                session.removeAttribute("desktopPath");
+            }
         }
         
         response.setContentType("application/json;charset=UTF-8");

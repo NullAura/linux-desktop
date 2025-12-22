@@ -118,6 +118,14 @@
         <servlet-name>FileOpenServlet</servlet-name>
         <url-pattern>/api/file/open</url-pattern>
     </servlet-mapping>
+    <servlet>
+        <servlet-name>FileCreateServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.FileCreateServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>FileCreateServlet</servlet-name>
+        <url-pattern>/api/file/create</url-pattern>
+    </servlet-mapping>
     
     <!-- 进程列表Servlet -->
     <servlet>
