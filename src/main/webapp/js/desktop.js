@@ -23,6 +23,11 @@ let processRefreshInFlight = false;
 let processSortKey = '';
 let processSortDir = 'asc';
 let lastProcessList = [];
+let dashboardTimer = null;
+let dashboardInFlight = false;
+let dashboardLastNetSample = null;
+let dashboardLastNetTimestamp = 0;
+let dashboardHideTimer = null;
 const windowMeta = {
     fileManagerWindow: { title: '文件管理器', icon: '📁' },
     processWindow: { title: '进程管理', icon: '⚙️' },
@@ -73,6 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化右键菜单
     initContextMenu();
     initFileManagerContextMenu();
+    initDashboard();
     
     // 任务栏时钟
     startTaskbarClock();
@@ -119,6 +125,7 @@ function updateConnectionStatus(connected, username, host) {
         switchPage(false);
         stopTerminalSession();
         stopProcessAutoRefresh();
+        closeDashboardPanel();
         clearOpenWindows();
     }
 }
@@ -859,6 +866,220 @@ function restoreDesktopBackground() {
     } catch (e) {
         localStorage.removeItem(DESKTOP_WALLPAPER_KEY);
     }
+}
+
+function initDashboard() {
+    const overlay = document.getElementById('dashboardOverlay');
+    if (overlay) {
+        overlay.addEventListener('click', () => toggleDashboard(false));
+    }
+    const closeBtn = document.getElementById('dashboardClose');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => toggleDashboard(false));
+    }
+}
+
+function toggleDashboard(forceOpen) {
+    const panel = document.getElementById('dashboardPanel');
+    if (!panel) return;
+    const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('open');
+    if (shouldOpen) {
+        openDashboardPanel();
+    } else {
+        closeDashboardPanel();
+    }
+}
+
+function openDashboardPanel() {
+    const panel = document.getElementById('dashboardPanel');
+    const overlay = document.getElementById('dashboardOverlay');
+    if (!panel || !overlay) return;
+    if (dashboardHideTimer) {
+        clearTimeout(dashboardHideTimer);
+        dashboardHideTimer = null;
+    }
+    panel.hidden = false;
+    overlay.hidden = false;
+    requestAnimationFrame(() => {
+        panel.classList.add('open');
+        overlay.classList.add('show');
+    });
+    resetDashboardDisplay();
+    startDashboardPolling();
+}
+
+function closeDashboardPanel() {
+    const panel = document.getElementById('dashboardPanel');
+    const overlay = document.getElementById('dashboardOverlay');
+    if (!panel || !overlay) return;
+    panel.classList.remove('open');
+    overlay.classList.remove('show');
+    stopDashboardPolling();
+    if (dashboardHideTimer) {
+        clearTimeout(dashboardHideTimer);
+    }
+    dashboardHideTimer = setTimeout(() => {
+        panel.hidden = true;
+        overlay.hidden = true;
+        dashboardHideTimer = null;
+    }, 250);
+}
+
+function startDashboardPolling() {
+    if (dashboardTimer) {
+        return;
+    }
+    fetchDashboardMetrics();
+    dashboardTimer = setInterval(fetchDashboardMetrics, 2000);
+}
+
+function stopDashboardPolling() {
+    if (dashboardTimer) {
+        clearInterval(dashboardTimer);
+        dashboardTimer = null;
+    }
+    dashboardInFlight = false;
+    dashboardLastNetSample = null;
+    dashboardLastNetTimestamp = 0;
+}
+
+function fetchDashboardMetrics() {
+    if (dashboardInFlight) {
+        return;
+    }
+    dashboardInFlight = true;
+    fetch(API_BASE + '/api/metrics')
+        .then(response => response.json())
+        .then(data => {
+            dashboardInFlight = false;
+            if (data && data.success) {
+                updateDashboardMetrics(data);
+            }
+        })
+        .catch(() => {
+            dashboardInFlight = false;
+        });
+}
+
+function updateDashboardMetrics(data) {
+    const cpuUsage = clampMetric(data.cpuUsage);
+    const diskUsage = clampMetric(data.diskUsage);
+    updatePieChart('cpuPie', 'cpuValue', cpuUsage, '#6dd3fb');
+    updatePieChart('diskPie', 'diskValue', diskUsage, '#f7b267');
+    updateDashboardText('cpuMeta', cpuUsage !== null ? `使用率 ${cpuUsage.toFixed(1)}%` : '数据获取中');
+    updateDashboardText('diskMeta', buildDiskMeta(data));
+    updateNetworkMetrics(data);
+}
+
+function resetDashboardDisplay() {
+    updatePieChart('cpuPie', 'cpuValue', null, '#6dd3fb');
+    updatePieChart('diskPie', 'diskValue', null, '#f7b267');
+    updateDashboardText('cpuMeta', '数据获取中');
+    updateDashboardText('diskMeta', '数据获取中');
+    const downEl = document.getElementById('netDown');
+    const upEl = document.getElementById('netUp');
+    const totalEl = document.getElementById('netTotal');
+    if (downEl) downEl.textContent = '--';
+    if (upEl) upEl.textContent = '--';
+    if (totalEl) totalEl.textContent = '--';
+}
+
+function updatePieChart(containerId, valueId, percent, color) {
+    const container = document.getElementById(containerId);
+    const valueEl = document.getElementById(valueId);
+    if (!container || !valueEl) return;
+    if (percent === null) {
+        valueEl.textContent = '--%';
+        container.style.background = 'conic-gradient(rgba(255,255,255,0.1) 0deg, rgba(255,255,255,0.1) 360deg)';
+        return;
+    }
+    const clamped = Math.max(0, Math.min(100, percent));
+    const angle = clamped * 3.6;
+    container.style.background = `conic-gradient(${color} 0deg ${angle}deg, rgba(255,255,255,0.08) ${angle}deg 360deg)`;
+    valueEl.textContent = `${clamped.toFixed(1)}%`;
+}
+
+function updateDashboardText(id, text) {
+    const node = document.getElementById(id);
+    if (node) {
+        node.textContent = text;
+    }
+}
+
+function clampMetric(value) {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+        return null;
+    }
+    return Math.max(0, Math.min(100, value));
+}
+
+function buildDiskMeta(data) {
+    if (!data || typeof data.diskUsedKb !== 'number' || typeof data.diskTotalKb !== 'number') {
+        return '数据获取中';
+    }
+    const used = formatKilobytes(data.diskUsedKb);
+    const total = formatKilobytes(data.diskTotalKb);
+    return `已用 ${used} / ${total}`;
+}
+
+function updateNetworkMetrics(data) {
+    const downEl = document.getElementById('netDown');
+    const upEl = document.getElementById('netUp');
+    const totalEl = document.getElementById('netTotal');
+    if (!downEl || !upEl || !totalEl) return;
+    const rx = typeof data.netRxBytes === 'number' ? data.netRxBytes : null;
+    const tx = typeof data.netTxBytes === 'number' ? data.netTxBytes : null;
+    const now = Date.now();
+    let downRate = null;
+    let upRate = null;
+    if (rx !== null && tx !== null && dashboardLastNetSample) {
+        const deltaTime = (now - dashboardLastNetTimestamp) / 1000;
+        if (deltaTime > 0) {
+            downRate = Math.max(0, (rx - dashboardLastNetSample.rx) / deltaTime);
+            upRate = Math.max(0, (tx - dashboardLastNetSample.tx) / deltaTime);
+        }
+    }
+    if (rx !== null && tx !== null) {
+        dashboardLastNetSample = { rx, tx };
+        dashboardLastNetTimestamp = now;
+    }
+    downEl.textContent = downRate === null ? '--' : `${formatBytes(downRate)}/s`;
+    upEl.textContent = upRate === null ? '--' : `${formatBytes(upRate)}/s`;
+    if (rx !== null && tx !== null) {
+        totalEl.textContent = `${formatBytes(rx)} / ${formatBytes(tx)}`;
+    } else {
+        totalEl.textContent = '--';
+    }
+}
+
+function formatKilobytes(value) {
+    if (value <= 0) {
+        return '0 KB';
+    }
+    const kb = value;
+    const mb = kb / 1024;
+    const gb = mb / 1024;
+    if (gb >= 1) {
+        return `${gb.toFixed(1)} GB`;
+    }
+    if (mb >= 1) {
+        return `${mb.toFixed(1)} MB`;
+    }
+    return `${Math.round(kb)} KB`;
+}
+
+function formatBytes(value) {
+    if (value <= 0) {
+        return '0 B';
+    }
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let size = value;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex++;
+    }
+    return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
 // 显示文件属性

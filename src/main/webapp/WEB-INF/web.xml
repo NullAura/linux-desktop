@@ -152,4 +152,12 @@
         <servlet-name>ProcessListServlet</servlet-name>
         <url-pattern>/api/process/list</url-pattern>
     </servlet-mapping>
+    <servlet>
+        <servlet-name>SystemMetricsServlet</servlet-name>
+        <servlet-class>com.linuxdesktop.servlet.SystemMetricsServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>SystemMetricsServlet</servlet-name>
+        <url-pattern>/api/metrics</url-pattern>
+    </servlet-mapping>
 </web-app>

@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Linux可视化桌面</title>
-    <link rel="stylesheet" href="css/desktop.css">
-    <link rel="stylesheet" href="css/connection-page.css">
+    <link rel="stylesheet" href="css/desktop.css?v=20250308">
+    <link rel="stylesheet" href="css/connection-page.css?v=20250308">
 </head>
 <body>
     <!-- 连接页面 -->
@@ -77,6 +77,9 @@
             <button class="taskbar-btn ghost" type="button" onclick="toggleTaskbarPosition()" title="切换任务栏位置（顶部/底部）">
                 ⬍
             </button>
+            <button class="taskbar-btn ghost" type="button" onclick="toggleDashboard()" title="系统仪表盘">
+                📊
+            </button>
             <span id="taskbarClock" class="taskbar-clock">--:--</span>
             <span id="connectionStatus" class="status-indicator">未连接</span>
         </div>
@@ -87,6 +90,51 @@
             <!-- 桌面图标将在这里动态生成 -->
         </div>
         <input type="file" id="wallpaperPicker" accept="image/*" style="display:none">
+        <div id="dashboardOverlay" class="dashboard-overlay" hidden></div>
+        <aside id="dashboardPanel" class="dashboard-panel" hidden>
+            <div class="dashboard-header">
+                <div>
+                    <div class="dashboard-title">系统仪表盘</div>
+                    <div class="dashboard-subtitle">实时状态</div>
+                </div>
+                <button class="dashboard-close" id="dashboardClose" type="button" title="关闭">×</button>
+            </div>
+            <div class="dashboard-content">
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <div class="card-title">CPU 使用率</div>
+                        <div class="pie-chart" id="cpuPie">
+                            <span class="pie-value" id="cpuValue">--%</span>
+                        </div>
+                        <div class="card-meta" id="cpuMeta">--</div>
+                    </div>
+                    <div class="dashboard-card">
+                        <div class="card-title">磁盘占用</div>
+                        <div class="pie-chart" id="diskPie">
+                            <span class="pie-value" id="diskValue">--%</span>
+                        </div>
+                        <div class="card-meta" id="diskMeta">--</div>
+                    </div>
+                </div>
+                <div class="dashboard-card wide">
+                    <div class="card-title">网络速率</div>
+                    <div class="network-stats">
+                        <div class="network-row">
+                            <span>下行</span>
+                            <span id="netDown">--</span>
+                        </div>
+                        <div class="network-row">
+                            <span>上行</span>
+                            <span id="netUp">--</span>
+                        </div>
+                        <div class="network-row subtle">
+                            <span>累计</span>
+                            <span id="netTotal">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
 
     <!-- 文件管理器窗口 -->
@@ -177,6 +225,6 @@
         </div>
     </div>
 
-    <script src="js/desktop.js"></script>
+    <script src="js/desktop.js?v=20250308"></script>
 </body>
 </html>
