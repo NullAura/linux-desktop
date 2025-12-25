@@ -18,6 +18,11 @@ let terminalHome = '';
 let terminalPrompt = '#';
 let terminalInitPending = false;
 let fileViewerPath = '';
+let processRefreshTimer = null;
+let processRefreshInFlight = false;
+let processSortKey = '';
+let processSortDir = 'asc';
+let lastProcessList = [];
 const windowMeta = {
     fileManagerWindow: { title: '文件管理器', icon: '📁' },
     processWindow: { title: '进程管理', icon: '⚙️' },
@@ -113,6 +118,7 @@ function updateConnectionStatus(connected, username, host) {
         // 切换到连接页面
         switchPage(false);
         stopTerminalSession();
+        stopProcessAutoRefresh();
         clearOpenWindows();
     }
 }
@@ -1087,55 +1093,165 @@ function openProcessManager() {
     ensureWindowPosition('processWindow', 2);
     bringWindowToFront('processWindow');
     registerWindow('processWindow');
-    refreshProcessList();
+    startProcessAutoRefresh();
 }
 
 // 刷新进程列表
-function refreshProcessList() {
+function refreshProcessList(options) {
+    if (processRefreshInFlight) {
+        return;
+    }
+    processRefreshInFlight = true;
+    const silent = options && options.silent;
     const content = document.getElementById('processContent');
-    content.innerHTML = '<div class="loading">正在加载...</div>';
+    if (!silent) {
+        content.innerHTML = '<div class="loading">正在加载...</div>';
+    }
     
     fetch(API_BASE + '/api/process/list')
         .then(response => response.json())
         .then(data => {
+            processRefreshInFlight = false;
             if (data.success) {
-                let html = `
-                    <table class="process-table">
-                        <thead>
-                            <tr>
-                                <th>PID</th>
-                                <th>用户</th>
-                                <th>CPU%</th>
-                                <th>内存%</th>
-                                <th>命令</th>
-                                <th>启动时间</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                
-                data.processes.forEach(process => {
-                    html += `
-                        <tr>
-                            <td>${escapeHtml(process.pid)}</td>
-                            <td>${escapeHtml(process.user)}</td>
-                            <td>${process.cpu.toFixed(2)}</td>
-                            <td>${process.memory.toFixed(2)}</td>
-                            <td>${escapeHtml(process.command.substring(0, 50))}${process.command.length > 50 ? '...' : ''}</td>
-                            <td>${escapeHtml(process.startTime)}</td>
-                        </tr>
-                    `;
-                });
-                
-                html += '</tbody></table>';
-                content.innerHTML = html;
-            } else {
+                lastProcessList = Array.isArray(data.processes) ? data.processes : [];
+                const processes = sortProcessList(lastProcessList);
+                content.innerHTML = renderProcessTable(processes);
+            } else if (!silent) {
                 content.innerHTML = '<div class="loading">错误: ' + data.message + '</div>';
             }
         })
         .catch(error => {
-            content.innerHTML = '<div class="loading">加载失败: ' + error.message + '</div>';
+            processRefreshInFlight = false;
+            if (!silent) {
+                content.innerHTML = '<div class="loading">加载失败: ' + error.message + '</div>';
+            }
         });
+}
+
+function renderProcessTable(processes) {
+    let html = `
+        <table class="process-table">
+            <thead>
+                <tr>
+                    <th class="sortable" onclick="toggleProcessSort('pid')">PID${getProcessSortIndicator('pid')}</th>
+                    <th class="sortable" onclick="toggleProcessSort('user')">用户${getProcessSortIndicator('user')}</th>
+                    <th class="sortable" onclick="toggleProcessSort('cpu')">CPU%${getProcessSortIndicator('cpu')}</th>
+                    <th class="sortable" onclick="toggleProcessSort('memory')">内存%${getProcessSortIndicator('memory')}</th>
+                    <th class="sortable" onclick="toggleProcessSort('command')">命令${getProcessSortIndicator('command')}</th>
+                    <th class="sortable" onclick="toggleProcessSort('startTime')">启动时间${getProcessSortIndicator('startTime')}</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    processes.forEach(process => {
+        const command = process.command || '';
+        html += `
+            <tr>
+                <td>${escapeHtml(process.pid)}</td>
+                <td>${escapeHtml(process.user)}</td>
+                <td>${Number(process.cpu || 0).toFixed(2)}</td>
+                <td>${Number(process.memory || 0).toFixed(2)}</td>
+                <td>${escapeHtml(command.substring(0, 50))}${command.length > 50 ? '...' : ''}</td>
+                <td>${escapeHtml(process.startTime)}</td>
+            </tr>
+        `;
+    });
+    html += '</tbody></table>';
+    return html;
+}
+
+function toggleProcessSort(key) {
+    if (processSortKey === key) {
+        processSortDir = processSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        processSortKey = key;
+        processSortDir = getProcessDefaultSortDir(key);
+    }
+    if (lastProcessList.length) {
+        const content = document.getElementById('processContent');
+        if (content) {
+            content.innerHTML = renderProcessTable(sortProcessList(lastProcessList));
+        }
+    }
+}
+
+function getProcessDefaultSortDir(key) {
+    if (key === 'cpu' || key === 'memory') {
+        return 'desc';
+    }
+    return 'asc';
+}
+
+function getProcessSortIndicator(key) {
+    if (processSortKey !== key) {
+        return '';
+    }
+    const marker = processSortDir === 'asc' ? '^' : 'v';
+    return ' <span class="sort-indicator">' + marker + '</span>';
+}
+
+function sortProcessList(processes) {
+    if (!processSortKey) {
+        return processes;
+    }
+    const dir = processSortDir === 'asc' ? 1 : -1;
+    const sorted = processes.slice();
+    sorted.sort((a, b) => {
+        const aVal = getProcessSortValue(a, processSortKey);
+        const bVal = getProcessSortValue(b, processSortKey);
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+            return (aVal - bVal) * dir;
+        }
+        const aStr = String(aVal || '');
+        const bStr = String(bVal || '');
+        return aStr.localeCompare(bStr, 'zh-CN') * dir;
+    });
+    return sorted;
+}
+
+function getProcessSortValue(process, key) {
+    if (!process) {
+        return '';
+    }
+    switch (key) {
+        case 'pid':
+            return Number(process.pid) || 0;
+        case 'cpu':
+            return Number(process.cpu) || 0;
+        case 'memory':
+            return Number(process.memory) || 0;
+        case 'user':
+            return process.user || '';
+        case 'command':
+            return process.command || '';
+        case 'startTime':
+            return process.startTime || '';
+        default:
+            return '';
+    }
+}
+
+function startProcessAutoRefresh() {
+    if (processRefreshTimer) {
+        return;
+    }
+    refreshProcessList();
+    processRefreshTimer = setInterval(() => {
+        const window = document.getElementById('processWindow');
+        if (!window || window.classList.contains('hidden')) {
+            stopProcessAutoRefresh();
+            return;
+        }
+        refreshProcessList({ silent: true });
+    }, 3000);
+}
+
+function stopProcessAutoRefresh() {
+    if (processRefreshTimer) {
+        clearInterval(processRefreshTimer);
+        processRefreshTimer = null;
+    }
+    processRefreshInFlight = false;
 }
 
 function sanitizeTerminalChunk(chunk) {
@@ -1709,6 +1825,8 @@ function closeWindow(windowId) {
         stopTerminalSession();
     } else if (windowId === 'fileViewerWindow') {
         fileViewerPath = '';
+    } else if (windowId === 'processWindow') {
+        stopProcessAutoRefresh();
     }
 }
 
