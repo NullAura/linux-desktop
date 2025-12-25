@@ -261,9 +261,12 @@
         </div>
         <div class="window-content">
             <div class="file-viewer-toolbar">
-                <button onclick="saveFileViewerContent()">💾 保存</button>
+                <button id="fileViewerSaveBtn" onclick="saveFileViewerContent()">💾 保存</button>
             </div>
             <textarea id="fileViewerContent" class="file-viewer-content" spellcheck="false"></textarea>
+            <div id="fileViewerImageWrap" class="file-viewer-image hidden">
+                <img id="fileViewerImage" alt="图片预览" />
+            </div>
         </div>
     </div>
 

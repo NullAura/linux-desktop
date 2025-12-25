@@ -39,27 +39,7 @@ public class FileOpenServlet extends HttpServlet {
             result.put("message", "文件路径不能为空");
         } else {
             try {
-                if ("view".equals(action)) {
-                    // 查看文本文件内容
-                    String command = "head -n 1000 '" + filePath + "'";
-                    String content = sshService.executeCommand(command);
-                    result.put("success", true);
-                    result.put("content", content);
-                    result.put("type", "text");
-                } else if ("edit".equals(action)) {
-                    String fileTypeCmd = "file -b '" + filePath + "'";
-                    String fileType = sshService.executeCommand(fileTypeCmd).trim();
-                    if (isTextFileType(fileType)) {
-                        String command = "cat '" + filePath + "'";
-                        String content = sshService.executeCommand(command);
-                        result.put("success", true);
-                        result.put("content", content);
-                        result.put("type", "edit");
-                    } else {
-                        result.put("success", false);
-                        result.put("message", "不支持的文件类型: " + fileType);
-                    }
-                } else if ("execute".equals(action)) {
+                if ("execute".equals(action)) {
                     // 执行可执行文件
                     String command = "'" + filePath + "'";
                     String output = sshService.executeCommand(command);
@@ -67,19 +47,41 @@ public class FileOpenServlet extends HttpServlet {
                     result.put("output", output);
                     result.put("type", "execute");
                 } else {
-                    // 默认判断文件类型
                     String fileTypeCmd = "file -b '" + filePath + "'";
-                    String fileType = sshService.executeCommand(fileTypeCmd).trim();
-                    
-                    if (isTextFileType(fileType)) {
-                        String command = "head -n 1000 '" + filePath + "'";
-                        String content = sshService.executeCommand(command);
-                        result.put("success", true);
-                        result.put("content", content);
-                        result.put("type", "text");
-                    } else {
+                    String fileTypeRaw = sshService.executeCommand(fileTypeCmd);
+                    if (fileTypeRaw == null) {
                         result.put("success", false);
-                        result.put("message", "不支持的文件类型: " + fileType);
+                        result.put("message", "无法识别文件类型");
+                    } else {
+                        String fileType = fileTypeRaw.trim();
+                        if (fileType.startsWith("错误") || fileType.contains("错误:")) {
+                            result.put("success", false);
+                            result.put("message", fileType);
+                        } else if (isImageFileType(fileType)) {
+                            String base64Command = "base64 '" + filePath + "' | tr -d '\\n\\r'";
+                            String base64Content = sshService.executeCommand(base64Command);
+                            if (base64Content == null || base64Content.trim().startsWith("错误")) {
+                                result.put("success", false);
+                                result.put("message", "读取图片失败: " + (base64Content == null ? "未知错误" : base64Content.trim()));
+                            } else {
+                                result.put("success", true);
+                                result.put("content", base64Content.trim());
+                                result.put("type", "image");
+                                result.put("mimeType", resolveImageMimeType(filePath, fileType, sshService));
+                            }
+                        } else if (isTextFileType(fileType)) {
+                            boolean useFullContent = "edit".equals(action);
+                            String command = useFullContent
+                                    ? "cat '" + filePath + "'"
+                                    : "head -n 1000 '" + filePath + "'";
+                            String content = sshService.executeCommand(command);
+                            result.put("success", true);
+                            result.put("content", content);
+                            result.put("type", useFullContent ? "edit" : "text");
+                        } else {
+                            result.put("success", false);
+                            result.put("message", "不支持的文件类型: " + fileType);
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -103,5 +105,62 @@ public class FileOpenServlet extends HttpServlet {
                 || fileTypeLower.contains("utf-8")
                 || fileTypeLower.contains("unicode")
                 || fileTypeLower.contains("empty");
+    }
+
+    private boolean isImageFileType(String fileType) {
+        if (fileType == null) {
+            return false;
+        }
+        String fileTypeLower = fileType.toLowerCase(Locale.ROOT);
+        return fileTypeLower.contains("image")
+                || fileTypeLower.contains("jpeg")
+                || fileTypeLower.contains("jpg")
+                || fileTypeLower.contains("png")
+                || fileTypeLower.contains("gif")
+                || fileTypeLower.contains("bmp")
+                || fileTypeLower.contains("webp")
+                || fileTypeLower.contains("svg")
+                || fileTypeLower.contains("tiff");
+    }
+
+    private String resolveImageMimeType(String filePath, String fileType, SSHService sshService) {
+        String mimeCommand = "file -b --mime-type '" + filePath + "'";
+        String mimeOutput = sshService.executeCommand(mimeCommand);
+        if (mimeOutput != null) {
+            String mimeType = mimeOutput.split("\n")[0].trim();
+            if (!mimeType.isEmpty() && !mimeType.startsWith("错误")) {
+                return mimeType;
+            }
+        }
+        return mapImageMimeType(fileType);
+    }
+
+    private String mapImageMimeType(String fileType) {
+        if (fileType == null) {
+            return "image/*";
+        }
+        String fileTypeLower = fileType.toLowerCase(Locale.ROOT);
+        if (fileTypeLower.contains("jpeg") || fileTypeLower.contains("jpg")) {
+            return "image/jpeg";
+        }
+        if (fileTypeLower.contains("png")) {
+            return "image/png";
+        }
+        if (fileTypeLower.contains("gif")) {
+            return "image/gif";
+        }
+        if (fileTypeLower.contains("bmp")) {
+            return "image/bmp";
+        }
+        if (fileTypeLower.contains("webp")) {
+            return "image/webp";
+        }
+        if (fileTypeLower.contains("svg")) {
+            return "image/svg+xml";
+        }
+        if (fileTypeLower.contains("tiff") || fileTypeLower.contains("tif")) {
+            return "image/tiff";
+        }
+        return "image/*";
     }
 }

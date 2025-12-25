@@ -616,7 +616,9 @@ function openFile(filePath) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            if (data.type === 'text' || data.type === 'edit') {
+            if (data.type === 'image') {
+                openImageViewer(filePath, data.content || '', data.mimeType || 'image/*');
+            } else if (data.type === 'text' || data.type === 'edit') {
                 openFileViewer(filePath, data.content || '');
             } else {
                 alert('文件内容:\n' + data.content);
@@ -636,6 +638,7 @@ function openFileViewer(filePath, content) {
     document.getElementById('fileViewerTitle').textContent = '文件查看器 - ' + filePath;
     const contentInput = document.getElementById('fileViewerContent');
     fileViewerPath = filePath;
+    showFileViewerTextMode();
     contentInput.value = content || '';
     contentInput.onkeydown = handleFileViewerKeyDown;
     window.classList.remove('hidden');
@@ -649,6 +652,70 @@ function handleFileViewerKeyDown(event) {
         event.preventDefault();
         saveFileViewerContent();
     }
+}
+
+function openImageViewer(filePath, base64Data, mimeType) {
+    const window = document.getElementById('fileViewerWindow');
+    const image = document.getElementById('fileViewerImage');
+    if (!window || !image) {
+        showMessage('图片预览失败', 'error');
+        return;
+    }
+    if (!base64Data) {
+        showMessage('图片内容为空', 'error');
+        return;
+    }
+    document.getElementById('fileViewerTitle').textContent = '文件查看器 - ' + filePath;
+    fileViewerPath = filePath;
+    showFileViewerImageMode(base64Data, mimeType || 'image/*');
+    window.classList.remove('hidden');
+    ensureWindowPosition('fileViewerWindow', 3);
+    bringWindowToFront('fileViewerWindow');
+    registerWindow('fileViewerWindow');
+}
+
+function showFileViewerTextMode() {
+    const contentInput = document.getElementById('fileViewerContent');
+    const imageWrap = document.getElementById('fileViewerImageWrap');
+    const image = document.getElementById('fileViewerImage');
+    if (contentInput) {
+        contentInput.classList.remove('hidden');
+    }
+    if (imageWrap) {
+        imageWrap.classList.add('hidden');
+    }
+    if (image) {
+        image.src = '';
+    }
+    toggleFileViewerSave(true);
+}
+
+function showFileViewerImageMode(base64Data, mimeType) {
+    const contentInput = document.getElementById('fileViewerContent');
+    const imageWrap = document.getElementById('fileViewerImageWrap');
+    const image = document.getElementById('fileViewerImage');
+    if (contentInput) {
+        contentInput.classList.add('hidden');
+    }
+    if (imageWrap) {
+        imageWrap.classList.remove('hidden');
+    }
+    if (image) {
+        image.src = base64Data ? `data:${mimeType};base64,${base64Data}` : '';
+    }
+    toggleFileViewerSave(false);
+}
+
+function toggleFileViewerSave(show) {
+    const button = document.getElementById('fileViewerSaveBtn');
+    if (button) {
+        button.style.display = show ? '' : 'none';
+    }
+}
+
+function isFileViewerImageMode() {
+    const imageWrap = document.getElementById('fileViewerImageWrap');
+    return imageWrap && !imageWrap.classList.contains('hidden');
 }
 
 // 显示文件右键菜单
@@ -1435,6 +1502,10 @@ function saveFileViewerContent() {
         showMessage('未打开可保存的文件', 'error');
         return;
     }
+    if (isFileViewerImageMode()) {
+        showMessage('图片不支持编辑', 'error');
+        return;
+    }
     const encoded = encodeBase64Utf8(contentInput.value || '');
     const payload = 'path=' + encodeURIComponent(fileViewerPath) +
         '&contentBase64=' + encodeURIComponent(encoded);
@@ -1467,6 +1538,24 @@ function encodeBase64Utf8(text) {
         binary += String.fromCharCode(byte);
     });
     return btoa(binary);
+}
+
+function resetFileViewer() {
+    fileViewerPath = '';
+    const contentInput = document.getElementById('fileViewerContent');
+    if (contentInput) {
+        contentInput.value = '';
+        contentInput.classList.remove('hidden');
+    }
+    const imageWrap = document.getElementById('fileViewerImageWrap');
+    if (imageWrap) {
+        imageWrap.classList.add('hidden');
+    }
+    const image = document.getElementById('fileViewerImage');
+    if (image) {
+        image.src = '';
+    }
+    toggleFileViewerSave(true);
 }
 
 // 打开进程管理
@@ -2207,7 +2296,7 @@ function closeWindow(windowId) {
     if (windowId === 'terminalWindow') {
         stopTerminalSession();
     } else if (windowId === 'fileViewerWindow') {
-        fileViewerPath = '';
+        resetFileViewer();
     } else if (windowId === 'processWindow') {
         stopProcessAutoRefresh();
     }
