@@ -30,12 +30,179 @@ let dashboardLastNetTimestamp = 0;
 let dashboardHideTimer = null;
 let fileManagerDragCounter = 0;
 const windowMeta = {
-    fileManagerWindow: { title: '文件管理器', icon: '📁' },
-    processWindow: { title: '进程管理', icon: '⚙️' },
-    terminalWindow: { title: '终端', icon: '💻' },
-    fileViewerWindow: { title: '文件查看器', icon: '📄' }
+    fileManagerWindow: { title: '文件管理器', iconKey: 'folder' },
+    processWindow: { title: '进程管理', iconKey: 'process' },
+    terminalWindow: { title: '终端', iconKey: 'terminal' },
+    fileViewerWindow: { title: '文件查看器', iconKey: 'doc' }
 };
 const openWindows = new Map();
+const IMAGE_EXTS = new Set([
+    'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'tif', 'tiff', 'ico', 'icns', 'heic', 'avif'
+]);
+const SCRIPT_EXTS = new Set([
+    'sh', 'bash', 'zsh', 'fish', 'ksh', 'csh', 'ps1', 'bat', 'cmd', 'vbs', 'py', 'rb', 'pl', 'php', 'lua'
+]);
+const CODE_EXTS = new Set([
+    'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx', 'java', 'c', 'cc', 'cpp', 'h', 'hpp', 'go', 'rs',
+    'swift', 'kt', 'kts', 'scala', 'cs', 'm', 'mm', 'sql'
+]);
+const CONFIG_EXTS = new Set([
+    'json', 'yml', 'yaml', 'toml', 'ini', 'conf', 'cfg', 'env', 'properties', 'lock'
+]);
+const ARCHIVE_EXTS = new Set([
+    'zip', 'rar', '7z', 'tar', 'gz', 'tgz', 'bz2', 'xz', 'zst', 'tbz', 'tbz2', 'txz'
+]);
+const AUDIO_EXTS = new Set([
+    'mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'opus', 'aiff', 'amr'
+]);
+const VIDEO_EXTS = new Set([
+    'mp4', 'mkv', 'mov', 'avi', 'webm', 'flv', 'm4v', 'mpg', 'mpeg', '3gp'
+]);
+const DOC_EXTS = new Set([
+    'txt', 'md', 'markdown', 'rtf', 'doc', 'docx'
+]);
+const SHEET_EXTS = new Set([
+    'xls', 'xlsx', 'csv', 'tsv', 'ods'
+]);
+const SLIDE_EXTS = new Set([
+    'ppt', 'pptx', 'key', 'odp'
+]);
+const DB_EXTS = new Set([
+    'db', 'sqlite', 'sqlite3', 'mdb'
+]);
+const FONT_EXTS = new Set([
+    'ttf', 'otf', 'woff', 'woff2'
+]);
+const LOG_EXTS = new Set([
+    'log'
+]);
+const PACKAGE_EXTS = new Set([
+    'deb', 'rpm', 'pkg', 'dmg', 'apk', 'ipa'
+]);
+const SPECIAL_FILE_ICON_KEYS = {
+    '.bashrc': 'script',
+    '.zshrc': 'script',
+    '.profile': 'script',
+    '.bash_profile': 'script',
+    '.gitignore': 'config',
+    '.env': 'config',
+    '.editorconfig': 'config',
+    '.npmrc': 'config',
+    '.vimrc': 'config',
+    'makefile': 'script',
+    'dockerfile': 'config',
+    'docker-compose.yml': 'config',
+    'docker-compose.yaml': 'config',
+    'readme': 'doc',
+    'readme.md': 'doc',
+    'license': 'doc',
+    'license.md': 'doc'
+};
+const FILE_ICON_SVGS = {
+    file: buildIconSvg(
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
+        '<polyline points="14 2 14 8 20 8"/>'
+    ),
+    folder: buildIconSvg(
+        '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2z"/>'
+    ),
+    link: buildIconSvg(
+        '<path d="M10 13a5 5 0 0 0 7.07 0l3.54-3.54a5 5 0 0 0-7.07-7.07L11 4"/>' +
+        '<path d="M14 11a5 5 0 0 0-7.07 0L3.39 14.54a5 5 0 0 0 7.07 7.07L13 20"/>'
+    ),
+    image: buildIconSvg(
+        '<rect x="3" y="3" width="18" height="18" rx="2"/>' +
+        '<circle cx="8.5" cy="8.5" r="1.5"/>' +
+        '<polyline points="21 15 16 10 5 21"/>'
+    ),
+    script: buildIconSvg(
+        '<polyline points="4 17 10 11 4 5"/>' +
+        '<line x1="12" y1="19" x2="20" y2="19"/>'
+    ),
+    code: buildIconSvg(
+        '<polyline points="16 18 22 12 16 6"/>' +
+        '<polyline points="8 6 2 12 8 18"/>'
+    ),
+    config: buildIconSvg(
+        '<line x1="4" y1="21" x2="4" y2="14"/>' +
+        '<line x1="4" y1="10" x2="4" y2="3"/>' +
+        '<line x1="12" y1="21" x2="12" y2="12"/>' +
+        '<line x1="12" y1="8" x2="12" y2="3"/>' +
+        '<line x1="20" y1="21" x2="20" y2="16"/>' +
+        '<line x1="20" y1="12" x2="20" y2="3"/>' +
+        '<circle cx="4" cy="12" r="2"/>' +
+        '<circle cx="12" cy="10" r="2"/>' +
+        '<circle cx="20" cy="14" r="2"/>'
+    ),
+    archive: buildIconSvg(
+        '<rect x="3" y="4" width="18" height="4"/>' +
+        '<path d="M5 8v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/>' +
+        '<line x1="10" y1="12" x2="14" y2="12"/>'
+    ),
+    audio: buildIconSvg(
+        '<path d="M9 18V5l12-2v13"/>' +
+        '<circle cx="6" cy="18" r="3"/>' +
+        '<circle cx="18" cy="16" r="3"/>'
+    ),
+    video: buildIconSvg(
+        '<rect x="2" y="7" width="15" height="10" rx="2"/>' +
+        '<polygon points="23 7 16 12 23 17"/>'
+    ),
+    pdf: buildIconSvg(
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
+        '<polyline points="14 2 14 8 20 8"/>' +
+        '<path d="M7 14h3a2 2 0 0 0 0-4H7v8"/>' +
+        '<path d="M14 10h2a2 2 0 0 1 0 4h-2v4"/>'
+    ),
+    sheet: buildIconSvg(
+        '<rect x="4" y="3" width="16" height="18" rx="2"/>' +
+        '<line x1="8" y1="7" x2="16" y2="7"/>' +
+        '<line x1="8" y1="11" x2="16" y2="11"/>' +
+        '<line x1="8" y1="15" x2="16" y2="15"/>' +
+        '<line x1="12" y1="7" x2="12" y2="19"/>'
+    ),
+    slide: buildIconSvg(
+        '<rect x="3" y="4" width="18" height="12" rx="2"/>' +
+        '<line x1="8" y1="20" x2="16" y2="20"/>' +
+        '<line x1="12" y1="16" x2="12" y2="20"/>'
+    ),
+    doc: buildIconSvg(
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
+        '<polyline points="14 2 14 8 20 8"/>' +
+        '<line x1="8" y1="13" x2="16" y2="13"/>' +
+        '<line x1="8" y1="17" x2="16" y2="17"/>'
+    ),
+    db: buildIconSvg(
+        '<ellipse cx="12" cy="5" rx="9" ry="3"/>' +
+        '<path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/>' +
+        '<path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/>'
+    ),
+    font: buildIconSvg(
+        '<polyline points="4 7 4 4 20 4 20 7"/>' +
+        '<line x1="9" y1="20" x2="15" y2="20"/>' +
+        '<line x1="12" y1="4" x2="12" y2="20"/>'
+    ),
+    log: buildIconSvg(
+        '<path d="M5 3h10l4 4v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/>' +
+        '<line x1="7" y1="13" x2="17" y2="13"/>' +
+        '<line x1="7" y1="17" x2="17" y2="17"/>'
+    ),
+    package: buildIconSvg(
+        '<path d="M16.5 9.4L7.5 4.21"/>' +
+        '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>' +
+        '<polyline points="3.27 6.96 12 12.01 20.73 6.96"/>' +
+        '<line x1="12" y1="22.08" x2="12" y2="12"/>'
+    ),
+    terminal: buildIconSvg(
+        '<polyline points="6 9 10 12 6 15"/>' +
+        '<line x1="12" y1="15" x2="18" y2="15"/>'
+    ),
+    process: buildIconSvg(
+        '<line x1="6" y1="18" x2="6" y2="10"/>' +
+        '<line x1="12" y1="18" x2="12" y2="6"/>' +
+        '<line x1="18" y1="18" x2="18" y2="12"/>'
+    )
+};
 
 // 获取应用上下文路径
 function getContextPath() {
@@ -230,8 +397,9 @@ function renderTaskbarWindows() {
         if (isVisible) {
             btn.classList.add('active');
         }
+        const iconKey = meta.iconKey || 'file';
         btn.innerHTML = `
-            <span class="taskbar-window-icon">${meta.icon}</span>
+            <span class="taskbar-window-icon file-icon--${iconKey}">${getFileIconSvg(iconKey)}</span>
             <span class="taskbar-window-title">${meta.title}</span>
         `;
         btn.addEventListener('click', () => {
@@ -516,9 +684,10 @@ function loadFileList(path) {
                 
                 // 如果不是根目录，添加返回上一级选项
                 if (path !== '/' && path !== '~' && !path.startsWith('/home')) {
+                    const folderSvg = getFileIconSvg('folder');
                     html += `
                         <div class="file-item" onclick="fileManagerNavigateTo('..')">
-                            <div class="file-icon">📁</div>
+                            <div class="file-icon file-icon--folder">${folderSvg}</div>
                             <div class="file-name">..</div>
                         </div>
                     `;
@@ -530,7 +699,8 @@ function loadFileList(path) {
                         return;
                     }
                     
-                    const icon = file.isDirectory ? '📁' : '📄';
+                    const iconKey = getFileIconKey(file.name, file.type, file.isDirectory);
+                    const iconSvg = getFileIconSvg(iconKey);
                     html += `
                         <div class="file-item" 
                              data-path="${escapeHtml(file.path)}"
@@ -538,7 +708,7 @@ function loadFileList(path) {
                              data-type="${file.type}"
                              onclick="fileItemClick(this, event)"
                              oncontextmenu="showFileContextMenu(event, '${escapeHtml(file.path)}', '${file.type}')">
-                            <div class="file-icon">${icon}</div>
+                            <div class="file-icon file-icon--${iconKey}">${iconSvg}</div>
                             <div class="file-name">${escapeHtml(file.name)}</div>
                         </div>
                     `;
@@ -1407,6 +1577,93 @@ function createFileItem(name, type, targetDir) {
     });
 }
 
+function getFileIconKey(fileName, fileType, isDirectory) {
+    if (fileType === 'directory' || isDirectory) {
+        return 'folder';
+    }
+    if (fileType === 'link') {
+        return 'link';
+    }
+    const name = (fileName || '').toLowerCase().trim();
+    if (!name || name === '.' || name === '..') {
+        return 'file';
+    }
+    if (SPECIAL_FILE_ICON_KEYS[name]) {
+        return SPECIAL_FILE_ICON_KEYS[name];
+    }
+    if (name.endsWith('.tar.gz') || name.endsWith('.tar.bz2') || name.endsWith('.tar.xz') || name.endsWith('.tar.zst')) {
+        return 'archive';
+    }
+    const ext = getFileExtension(name);
+    if (!ext) {
+        return 'file';
+    }
+    if (IMAGE_EXTS.has(ext)) {
+        return 'image';
+    }
+    if (SCRIPT_EXTS.has(ext)) {
+        return 'script';
+    }
+    if (CODE_EXTS.has(ext)) {
+        return 'code';
+    }
+    if (CONFIG_EXTS.has(ext)) {
+        return 'config';
+    }
+    if (ARCHIVE_EXTS.has(ext)) {
+        return 'archive';
+    }
+    if (AUDIO_EXTS.has(ext)) {
+        return 'audio';
+    }
+    if (VIDEO_EXTS.has(ext)) {
+        return 'video';
+    }
+    if (ext === 'pdf') {
+        return 'pdf';
+    }
+    if (SHEET_EXTS.has(ext)) {
+        return 'sheet';
+    }
+    if (SLIDE_EXTS.has(ext)) {
+        return 'slide';
+    }
+    if (DOC_EXTS.has(ext)) {
+        return 'doc';
+    }
+    if (DB_EXTS.has(ext)) {
+        return 'db';
+    }
+    if (FONT_EXTS.has(ext)) {
+        return 'font';
+    }
+    if (LOG_EXTS.has(ext)) {
+        return 'log';
+    }
+    if (PACKAGE_EXTS.has(ext)) {
+        return 'package';
+    }
+    return 'file';
+}
+
+function getFileIconSvg(key) {
+    return FILE_ICON_SVGS[key] || FILE_ICON_SVGS.file;
+}
+
+function buildIconSvg(paths) {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" ' +
+        'stroke="currentColor" stroke-width="1.7" fill="none" ' +
+        'stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>';
+}
+
+function getFileExtension(name) {
+    const lastDot = name.lastIndexOf('.');
+    if (lastDot <= 0 || lastDot === name.length - 1) {
+        return '';
+    }
+    return name.substring(lastDot + 1);
+}
+
 function getCurrentDirectory() {
     const input = document.getElementById('filePathInput');
     if (input && input.value) {
@@ -1475,8 +1732,9 @@ function refreshDesktopFiles() {
                     showFileContextMenu(event, file.path, file.type);
                 });
                 const iconGlyph = document.createElement('div');
-                iconGlyph.className = 'desktop-icon-icon';
-                iconGlyph.textContent = file.isDirectory ? '📁' : '📄';
+                const iconKey = getFileIconKey(file.name, file.type, file.isDirectory);
+                iconGlyph.className = `desktop-icon-icon file-icon--${iconKey}`;
+                iconGlyph.innerHTML = getFileIconSvg(iconKey);
                 const label = document.createElement('div');
                 label.className = 'desktop-icon-label';
                 label.textContent = file.name;
@@ -2393,19 +2651,19 @@ function initDesktopIcons() {
     const desktopApps = [
         {
             id: 'fileManager',
-            icon: '📁',
+            iconKey: 'folder',
             name: '文件管理器',
             action: function() { openFileManager(); }
         },
         {
             id: 'terminal',
-            icon: '💻',
+            iconKey: 'terminal',
             name: '终端',
             action: function() { openTerminal(); }
         },
         {
             id: 'processManager',
-            icon: '⚙️',
+            iconKey: 'process',
             name: '进程管理',
             action: function() { openProcessManager(); }
         }
@@ -2429,7 +2687,7 @@ function initDesktopIcons() {
                  data-app-id="${app.id}"
                  onclick="desktopIconClick('${app.id}')"
                  oncontextmenu="showDesktopIconContextMenu(event, '${app.id}'); return false;">
-                <div class="desktop-icon-icon">${app.icon}</div>
+                <div class="desktop-icon-icon file-icon--${app.iconKey}">${getFileIconSvg(app.iconKey)}</div>
                 <div class="desktop-icon-label">${app.name}</div>
             </div>
         `;
@@ -2574,11 +2832,13 @@ function showDesktopIconProperties(appId) {
         'processManager': '进程管理'
     };
     
-    const appIcons = {
-        'fileManager': '📁',
-        'terminal': '💻',
-        'processManager': '⚙️'
+    const appIconKeys = {
+        'fileManager': 'folder',
+        'terminal': 'terminal',
+        'processManager': 'process'
     };
+    const iconKey = appIconKeys[appId] || 'file';
+    const iconSvg = getFileIconSvg(iconKey);
     
     const content = document.getElementById('propertyContent');
     content.innerHTML = `
@@ -2592,7 +2852,7 @@ function showDesktopIconProperties(appId) {
         </div>
         <div class="property-item">
             <div class="property-label">图标:</div>
-            <div class="property-value">${appIcons[appId]}</div>
+            <div class="property-value"><span class="property-icon file-icon--${iconKey}">${iconSvg}</span></div>
         </div>
     `;
     document.getElementById('propertyDialog').classList.remove('hidden');

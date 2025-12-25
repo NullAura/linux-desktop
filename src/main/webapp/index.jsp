@@ -58,16 +58,32 @@
     <div class="taskbar">
         <div class="taskbar-left">
             <button class="taskbar-btn" onclick="disconnectSSH()" title="断开连接">
-                <span>🔌</span> 断开连接
+                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                    <path d="M5.5 5.5a8 8 0 1 0 13 0"></path>
+                </svg>
+                断开连接
             </button>
             <button class="taskbar-btn" onclick="openFileManager()" title="文件管理器">
-                <span>📁</span> 文件管理器
+                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+                文件管理器
             </button>
             <button class="taskbar-btn" onclick="openProcessManager()" title="进程管理">
-                <span>⚙️</span> 进程管理
+                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <line x1="6" y1="18" x2="6" y2="10"></line>
+                    <line x1="12" y1="18" x2="12" y2="6"></line>
+                    <line x1="18" y1="18" x2="18" y2="12"></line>
+                </svg>
+                进程管理
             </button>
             <button class="taskbar-btn" onclick="openTerminal()" title="终端">
-                <span>💻</span> 终端
+                <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <polyline points="6 9 10 12 6 15"></polyline>
+                    <line x1="12" y1="15" x2="18" y2="15"></line>
+                </svg>
+                终端
             </button>
         </div>
         <div class="taskbar-center taskbar-windows" id="taskbarWindows">
@@ -75,7 +91,10 @@
         </div>
         <div class="taskbar-right">
             <button class="taskbar-btn ghost" type="button" onclick="toggleTaskbarPosition()" title="切换任务栏位置（顶部/底部）">
-                ⬍
+                <svg class="btn-icon solo" viewBox="0 0 24 24" aria-hidden="true">
+                    <polyline points="6 9 12 3 18 9"></polyline>
+                    <polyline points="6 15 12 21 18 15"></polyline>
+                </svg>
             </button>
             <button class="taskbar-btn ghost dashboard-toggle" type="button" onclick="toggleDashboard()" title="系统仪表盘" aria-label="系统仪表盘">
                 <svg class="dashboard-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -191,9 +210,27 @@
         </div>
         <div class="window-content">
             <div class="file-manager-toolbar">
-                <button onclick="fileManagerGoHome()">🏠 主页</button>
-                <button onclick="fileManagerGoBack()">← 返回</button>
-                <button onclick="fileManagerRefresh()">🔄 刷新</button>
+                <button onclick="fileManagerGoHome()">
+                    <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 11l9-7 9 7"></path>
+                        <path d="M5 10v10h14V10"></path>
+                    </svg>
+                    主页
+                </button>
+                <button onclick="fileManagerGoBack()">
+                    <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                        <line x1="9" y1="12" x2="21" y2="12"></line>
+                    </svg>
+                    返回
+                </button>
+                <button onclick="fileManagerRefresh()">
+                    <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <polyline points="1 4 1 10 7 10"></polyline>
+                        <path d="M3.5 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                    </svg>
+                    刷新
+                </button>
                 <input type="text" id="filePathInput" placeholder="当前路径" onkeypress="if(event.key==='Enter') fileManagerNavigate()">
                 <button onclick="fileManagerNavigate()">前往</button>
             </div>
@@ -215,7 +252,13 @@
         </div>
         <div class="window-content">
             <div class="process-toolbar">
-                <button onclick="refreshProcessList()">🔄 刷新</button>
+                <button onclick="refreshProcessList()">
+                    <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <polyline points="1 4 1 10 7 10"></polyline>
+                        <path d="M3.5 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                    </svg>
+                    刷新
+                </button>
             </div>
             <div class="process-content" id="processContent">
                 <div class="loading">正在加载...</div>
@@ -261,7 +304,14 @@
         </div>
         <div class="window-content">
             <div class="file-viewer-toolbar">
-                <button id="fileViewerSaveBtn" onclick="saveFileViewerContent()">💾 保存</button>
+                <button id="fileViewerSaveBtn" onclick="saveFileViewerContent()">
+                    <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                        <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    保存
+                </button>
             </div>
             <textarea id="fileViewerContent" class="file-viewer-content" spellcheck="false"></textarea>
             <div id="fileViewerImageWrap" class="file-viewer-image hidden">
