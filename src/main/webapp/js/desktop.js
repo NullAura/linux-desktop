@@ -877,6 +877,10 @@ function initDashboard() {
     if (closeBtn) {
         closeBtn.addEventListener('click', () => toggleDashboard(false));
     }
+    const edgeToggle = document.getElementById('dashboardEdgeToggle');
+    if (edgeToggle) {
+        edgeToggle.addEventListener('click', () => toggleDashboard(true));
+    }
 }
 
 function toggleDashboard(forceOpen) {
@@ -894,6 +898,7 @@ function openDashboardPanel() {
     const panel = document.getElementById('dashboardPanel');
     const overlay = document.getElementById('dashboardOverlay');
     const toggleBtn = document.querySelector('.dashboard-toggle');
+    const edgeZone = document.getElementById('dashboardEdgeZone');
     if (!panel || !overlay) return;
     if (dashboardHideTimer) {
         clearTimeout(dashboardHideTimer);
@@ -908,6 +913,9 @@ function openDashboardPanel() {
     if (toggleBtn) {
         toggleBtn.classList.add('active');
     }
+    if (edgeZone) {
+        edgeZone.classList.add('open');
+    }
     resetDashboardDisplay();
     startDashboardPolling();
 }
@@ -916,12 +924,16 @@ function closeDashboardPanel() {
     const panel = document.getElementById('dashboardPanel');
     const overlay = document.getElementById('dashboardOverlay');
     const toggleBtn = document.querySelector('.dashboard-toggle');
+    const edgeZone = document.getElementById('dashboardEdgeZone');
     if (!panel || !overlay) return;
     panel.classList.remove('open');
     overlay.classList.remove('show');
     stopDashboardPolling();
     if (toggleBtn) {
         toggleBtn.classList.remove('active');
+    }
+    if (edgeZone) {
+        edgeZone.classList.remove('open');
     }
     if (dashboardHideTimer) {
         clearTimeout(dashboardHideTimer);

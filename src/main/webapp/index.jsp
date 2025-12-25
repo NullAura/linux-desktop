@@ -97,6 +97,13 @@
             <!-- 桌面图标将在这里动态生成 -->
         </div>
         <input type="file" id="wallpaperPicker" accept="image/*" style="display:none">
+        <div id="dashboardEdgeZone" class="dashboard-edge-zone" aria-hidden="true">
+            <button id="dashboardEdgeToggle" class="dashboard-edge-toggle" type="button" aria-label="展开仪表盘">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
         <div id="dashboardOverlay" class="dashboard-overlay" hidden></div>
         <aside id="dashboardPanel" class="dashboard-panel" hidden>
             <div class="dashboard-header">
