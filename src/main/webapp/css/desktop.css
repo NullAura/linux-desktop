@@ -11,6 +11,8 @@ body {
     overflow: hidden;
     margin: 0;
     padding: 0;
+    --dashboard-top: 60px;
+    --dashboard-bottom: 80px;
 }
 
 /* 任务栏 */
@@ -121,6 +123,29 @@ body {
     background: rgba(255, 255, 255, 0.1);
 }
 
+.taskbar-btn.dashboard-toggle {
+    border: 1px solid rgba(109, 211, 251, 0.55);
+    background: rgba(12, 40, 66, 0.45);
+    box-shadow: 0 0 16px rgba(109, 211, 251, 0.35);
+}
+
+.taskbar-btn.dashboard-toggle:hover {
+    background: rgba(12, 40, 66, 0.65);
+    box-shadow: 0 0 20px rgba(109, 211, 251, 0.5);
+}
+
+.taskbar-btn.dashboard-toggle.active {
+    background: rgba(34, 120, 170, 0.55);
+    box-shadow: 0 0 26px rgba(109, 211, 251, 0.65);
+}
+
+.dashboard-toggle-icon {
+    width: 18px;
+    height: 18px;
+    display: inline-block;
+    color: #8fe8ff;
+}
+
 .taskbar-windows {
     display: flex;
     gap: 8px;
@@ -163,6 +188,11 @@ body {
     border-top: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+body.taskbar-top {
+    --dashboard-top: 80px;
+    --dashboard-bottom: 40px;
 }
 
 /* 桌面 */
@@ -478,11 +508,14 @@ body:not(.taskbar-top) .desktop {
 .dashboard-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(7, 10, 20, 0.35);
+    background:
+        radial-gradient(circle at 80% 20%, rgba(109, 211, 251, 0.18), transparent 40%),
+        rgba(7, 10, 20, 0.4);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease;
     z-index: 1199;
+    backdrop-filter: blur(2px);
 }
 
 .dashboard-overlay.show {
@@ -492,19 +525,21 @@ body:not(.taskbar-top) .desktop {
 
 .dashboard-panel {
     position: fixed;
-    top: 0;
-    right: 0;
+    top: var(--dashboard-top);
+    right: 18px;
     width: 320px;
-    height: 100vh;
-    padding: 18px 18px 70px;
-    background: rgba(11, 18, 36, 0.88);
-    border-left: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: -12px 0 30px rgba(0, 0, 0, 0.35);
+    height: calc(100vh - var(--dashboard-top) - var(--dashboard-bottom));
+    padding: 18px;
+    background: linear-gradient(160deg, rgba(16, 26, 50, 0.96), rgba(9, 13, 26, 0.9));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+    box-shadow: -16px 12px 34px rgba(0, 0, 0, 0.45), inset 0 0 30px rgba(109, 211, 251, 0.05);
     backdrop-filter: blur(18px) saturate(140%);
-    transform: translateX(100%);
+    transform: translateX(120%) scale(0.98);
+    transform-origin: right center;
     opacity: 0;
     pointer-events: none;
-    transition: transform 0.25s ease, opacity 0.25s ease;
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
     z-index: 1200;
     display: flex;
     flex-direction: column;
@@ -513,14 +548,21 @@ body:not(.taskbar-top) .desktop {
 }
 
 .dashboard-panel.open {
-    transform: translateX(0);
+    transform: translateX(0) scale(1);
     opacity: 1;
     pointer-events: auto;
 }
 
-body.taskbar-top .dashboard-panel {
-    padding-top: 70px;
-    padding-bottom: 18px;
+.dashboard-panel::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 16px;
+    bottom: 16px;
+    width: 3px;
+    background: linear-gradient(180deg, rgba(109, 211, 251, 0.9), rgba(247, 178, 103, 0.6));
+    border-radius: 0 4px 4px 0;
+    opacity: 0.7;
 }
 
 .dashboard-header {
@@ -579,6 +621,8 @@ body.taskbar-top .dashboard-panel {
     flex-direction: column;
     gap: 10px;
     min-height: 170px;
+    position: relative;
+    overflow: hidden;
 }
 
 .dashboard-card.wide {
@@ -586,8 +630,41 @@ body.taskbar-top .dashboard-panel {
 }
 
 .card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 13px;
     color: rgba(233, 238, 251, 0.85);
+}
+
+.card-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: rgba(109, 211, 251, 0.12);
+    border: 1px solid rgba(109, 211, 251, 0.45);
+    color: #8fe8ff;
+    flex-shrink: 0;
+}
+
+.card-icon.disk {
+    background: rgba(247, 178, 103, 0.15);
+    border-color: rgba(247, 178, 103, 0.5);
+    color: #f7b267;
+}
+
+.card-icon.net {
+    background: rgba(124, 242, 199, 0.16);
+    border-color: rgba(124, 242, 199, 0.5);
+    color: #7cf2c7;
+}
+
+.card-icon svg {
+    width: 14px;
+    height: 14px;
+    display: block;
 }
 
 .card-meta {
@@ -605,6 +682,7 @@ body.taskbar-top .dashboard-panel {
     place-items: center;
     align-self: center;
     position: relative;
+    box-shadow: 0 0 18px rgba(109, 211, 251, 0.25);
 }
 
 .pie-chart::after {

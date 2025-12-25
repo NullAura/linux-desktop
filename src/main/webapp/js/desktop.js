@@ -893,6 +893,7 @@ function toggleDashboard(forceOpen) {
 function openDashboardPanel() {
     const panel = document.getElementById('dashboardPanel');
     const overlay = document.getElementById('dashboardOverlay');
+    const toggleBtn = document.querySelector('.dashboard-toggle');
     if (!panel || !overlay) return;
     if (dashboardHideTimer) {
         clearTimeout(dashboardHideTimer);
@@ -904,6 +905,9 @@ function openDashboardPanel() {
         panel.classList.add('open');
         overlay.classList.add('show');
     });
+    if (toggleBtn) {
+        toggleBtn.classList.add('active');
+    }
     resetDashboardDisplay();
     startDashboardPolling();
 }
@@ -911,10 +915,14 @@ function openDashboardPanel() {
 function closeDashboardPanel() {
     const panel = document.getElementById('dashboardPanel');
     const overlay = document.getElementById('dashboardOverlay');
+    const toggleBtn = document.querySelector('.dashboard-toggle');
     if (!panel || !overlay) return;
     panel.classList.remove('open');
     overlay.classList.remove('show');
     stopDashboardPolling();
+    if (toggleBtn) {
+        toggleBtn.classList.remove('active');
+    }
     if (dashboardHideTimer) {
         clearTimeout(dashboardHideTimer);
     }

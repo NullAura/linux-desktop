@@ -77,8 +77,15 @@
             <button class="taskbar-btn ghost" type="button" onclick="toggleTaskbarPosition()" title="切换任务栏位置（顶部/底部）">
                 ⬍
             </button>
-            <button class="taskbar-btn ghost" type="button" onclick="toggleDashboard()" title="系统仪表盘">
-                📊
+            <button class="taskbar-btn ghost dashboard-toggle" type="button" onclick="toggleDashboard()" title="系统仪表盘" aria-label="系统仪表盘">
+                <svg class="dashboard-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 4h16v16H4z" fill="none" stroke="currentColor" stroke-width="1.6" rx="3"/>
+                    <path d="M8 15l2-3 3 2 3-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="8" cy="15" r="1.3" fill="currentColor"/>
+                    <circle cx="10" cy="12" r="1.3" fill="currentColor"/>
+                    <circle cx="13" cy="14" r="1.3" fill="currentColor"/>
+                    <circle cx="16" cy="9" r="1.3" fill="currentColor"/>
+                </svg>
             </button>
             <span id="taskbarClock" class="taskbar-clock">--:--</span>
             <span id="connectionStatus" class="status-indicator">未连接</span>
@@ -102,14 +109,32 @@
             <div class="dashboard-content">
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
-                        <div class="card-title">CPU 使用率</div>
+                        <div class="card-title">
+                            <span class="card-icon cpu" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <rect x="7" y="7" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                                    <rect x="10" y="10" width="4" height="4" rx="1" fill="currentColor"/>
+                                    <path d="M4 9h2M4 15h2M18 9h2M18 15h2M9 4v2M15 4v2M9 18v2M15 18v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                            CPU 使用率
+                        </div>
                         <div class="pie-chart" id="cpuPie">
                             <span class="pie-value" id="cpuValue">--%</span>
                         </div>
                         <div class="card-meta" id="cpuMeta">--</div>
                     </div>
                     <div class="dashboard-card">
-                        <div class="card-title">磁盘占用</div>
+                        <div class="card-title">
+                            <span class="card-icon disk" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <ellipse cx="12" cy="6" rx="7" ry="3" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                                    <path d="M5 6v8c0 1.7 3.1 3 7 3s7-1.3 7-3V6" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                                    <path d="M5 10c0 1.7 3.1 3 7 3s7-1.3 7-3" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                                </svg>
+                            </span>
+                            磁盘占用
+                        </div>
                         <div class="pie-chart" id="diskPie">
                             <span class="pie-value" id="diskValue">--%</span>
                         </div>
@@ -117,7 +142,17 @@
                     </div>
                 </div>
                 <div class="dashboard-card wide">
-                    <div class="card-title">网络速率</div>
+                    <div class="card-title">
+                        <span class="card-icon net" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M7 7l5-4 5 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 4v10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                                <path d="M17 17l-5 4-5-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 20V10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                            </svg>
+                        </span>
+                        网络速率
+                    </div>
                     <div class="network-stats">
                         <div class="network-row">
                             <span>下行</span>
