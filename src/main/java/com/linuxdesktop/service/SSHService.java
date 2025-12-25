@@ -151,6 +151,35 @@ public class SSHService {
             }
         }
     }
+
+    /**
+     * 上传文件到远端路径
+     */
+    public void uploadFile(String remotePath, InputStream input) throws JSchException, SftpException {
+        if (session == null || !session.isConnected()) {
+            throw new IllegalStateException("未连接到SSH服务器");
+        }
+        if (remotePath == null || remotePath.trim().isEmpty()) {
+            throw new IllegalArgumentException("远程路径不能为空");
+        }
+        if (input == null) {
+            throw new IllegalArgumentException("文件内容不能为空");
+        }
+
+        ChannelSftp channel = null;
+        try {
+            channel = (ChannelSftp) session.openChannel("sftp");
+            channel.connect(10000);
+            channel.put(input, remotePath);
+        } finally {
+            if (channel != null) {
+                try {
+                    channel.disconnect();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
     
     /**
      * 检查连接状态

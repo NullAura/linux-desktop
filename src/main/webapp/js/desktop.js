@@ -28,6 +28,7 @@ let dashboardInFlight = false;
 let dashboardLastNetSample = null;
 let dashboardLastNetTimestamp = 0;
 let dashboardHideTimer = null;
+let fileManagerDragCounter = 0;
 const windowMeta = {
     fileManagerWindow: { title: '文件管理器', icon: '📁' },
     processWindow: { title: '进程管理', icon: '⚙️' },
@@ -78,6 +79,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化右键菜单
     initContextMenu();
     initFileManagerContextMenu();
+    initFileManagerDragUpload();
     initDashboard();
     
     // 任务栏时钟
@@ -759,6 +761,146 @@ function initFileManagerContextMenu() {
         event.preventDefault();
         event.stopPropagation();
         showFileManagerContextMenu(event);
+    });
+}
+
+function initFileManagerDragUpload() {
+    const content = document.getElementById('fileManagerContent');
+    if (!content) return;
+
+    document.addEventListener('dragover', (event) => {
+        if (hasFileDrag(event)) {
+            event.preventDefault();
+        }
+    });
+
+    document.addEventListener('drop', (event) => {
+        if (hasFileDrag(event)) {
+            event.preventDefault();
+        }
+    });
+
+    content.addEventListener('dragenter', (event) => {
+        if (!hasFileDrag(event)) return;
+        if (isFileManagerHidden()) return;
+        event.preventDefault();
+        fileManagerDragCounter += 1;
+        content.classList.add('drag-over');
+    });
+
+    content.addEventListener('dragover', (event) => {
+        if (!hasFileDrag(event)) return;
+        if (isFileManagerHidden()) return;
+        event.preventDefault();
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = 'copy';
+        }
+    });
+
+    content.addEventListener('dragleave', (event) => {
+        if (!hasFileDrag(event)) return;
+        if (isFileManagerHidden()) return;
+        event.preventDefault();
+        fileManagerDragCounter -= 1;
+        if (fileManagerDragCounter <= 0) {
+            fileManagerDragCounter = 0;
+            content.classList.remove('drag-over');
+        }
+    });
+
+    content.addEventListener('drop', (event) => {
+        if (!hasFileDrag(event)) return;
+        if (isFileManagerHidden()) return;
+        event.preventDefault();
+        fileManagerDragCounter = 0;
+        content.classList.remove('drag-over');
+        const files = Array.from(event.dataTransfer ? event.dataTransfer.files : []);
+        if (!files.length) return;
+        uploadFilesToCurrentDir(files);
+    });
+}
+
+function hasFileDrag(event) {
+    if (!event.dataTransfer || !event.dataTransfer.types) {
+        return false;
+    }
+    return Array.from(event.dataTransfer.types).includes('Files');
+}
+
+function isFileManagerHidden() {
+    const window = document.getElementById('fileManagerWindow');
+    return !window || window.classList.contains('hidden');
+}
+
+function uploadFilesToCurrentDir(files) {
+    if (!files || files.length === 0) {
+        return;
+    }
+    if (!isSSHConnected()) {
+        showMessage('请先连接SSH服务器', 'error');
+        return;
+    }
+    const targetDir = getCurrentDirectory();
+    if (!targetDir) {
+        showMessage('目标目录无效', 'error');
+        return;
+    }
+
+    const total = files.length;
+    let uploaded = 0;
+    let failed = 0;
+    let chain = Promise.resolve();
+
+    showMessage(`正在上传 ${total} 个文件...`, 'info');
+
+    files.forEach(file => {
+        chain = chain.then(() => uploadSingleFile(file, targetDir)
+            .then(() => {
+                uploaded += 1;
+            })
+            .catch(error => {
+                failed += 1;
+                const message = error && error.message ? error.message : String(error || '上传失败');
+                showMessage(`上传失败: ${file.name || '未命名文件'} (${message})`, 'error');
+            }));
+    });
+
+    chain.then(() => {
+        loadFileList(targetDir);
+        refreshDesktopFiles();
+        if (failed === 0) {
+            showMessage(`上传完成 (${uploaded}/${total})`, 'success');
+        } else if (uploaded > 0) {
+            showMessage(`上传完成，失败 ${failed} 个`, 'error');
+        } else {
+            showMessage('上传失败', 'error');
+        }
+    });
+}
+
+function uploadSingleFile(file, targetDir) {
+    const formData = new FormData();
+    formData.append('path', targetDir);
+    formData.append('file', file, file.name);
+
+    return fetch(API_BASE + '/api/file/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            return response.text().then(text => {
+                throw new Error('非JSON响应');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (!data || !data.success) {
+            throw new Error((data && data.message) ? data.message : '上传失败');
+        }
+        return data;
     });
 }
 
